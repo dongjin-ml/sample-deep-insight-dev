@@ -141,56 +141,30 @@ class strands_utils():
     @staticmethod
     def get_model(**kwargs):
 
-        llm_type = kwargs["llm_type"]
+        model_id = kwargs["llm_type"]  # Now receives full model ID directly from env
         enable_reasoning = kwargs["enable_reasoning"]
         tool_cache = kwargs["tool_cache"]
 
-        if llm_type in ["claude-sonnet-3-7", "claude-sonnet-4", "claude-sonnet-4-5"]:
-            
-            if llm_type == "claude-sonnet-3-7": model_name = "Claude-V3-7-Sonnet-CRI"
-            elif llm_type == "claude-sonnet-4": model_name = "Claude-V4-Sonnet-CRI"
-            elif llm_type == "claude-sonnet-4-5": model_name = "Claude-V4-5-Sonnet-CRI"
-
-            ## BedrockModel params: https://strandsagents.com/latest/api-reference/models/?h=bedrockmodel#strands.models.bedrock.BedrockModel
-            llm = BedrockModel(
-                model_id=bedrock_info.get_model_id(model_name=model_name),
-                streaming=True,
-                cache_tools="default" if tool_cache else None,
-                max_tokens=8192*5,
-                stop_sequences=["\n\nHuman"],
-                temperature=1 if enable_reasoning else 0.01,
-                additional_request_fields={
-                    "thinking": {
-                        "type": "enabled" if enable_reasoning else "disabled",
-                        **({"budget_tokens": 8192} if enable_reasoning else {}),
-                    }
-                },
-                # cache_prompt parameter removed - use SystemContentBlock with cachePoint instead
-                #cache_tools: Cache point type for tools
-                boto_client_config=Config(
-                    read_timeout=900,
-                    connect_timeout=900,
-                    retries=dict(max_attempts=50, mode="adaptive"),
-                )
-            )   
-        elif llm_type == "claude-sonnet-3-5-v-2":
-            ## BedrockModel params: https://strandsagents.com/latest/api-reference/models/?h=bedrockmodel#strands.models.bedrock.BedrockModel
-            llm = BedrockModel(
-                model_id=bedrock_info.get_model_id(model_name="Claude-V3-5-V-2-Sonnet-CRI"),
-                streaming=True,
-                max_tokens=8192,
-                stop_sequences=["\n\nHuman"],
-                temperature=0.01,
-                # cache_prompt parameter removed - use SystemContentBlock with cachePoint instead
-                #cache_tools: Cache point type for tools
-                boto_client_config=Config(
-                    read_timeout=900,
-                    connect_timeout=900,
-                    retries=dict(max_attempts=50, mode="standard"),
-                )
+        ## BedrockModel params: https://strandsagents.com/latest/api-reference/models/?h=bedrockmodel#strands.models.bedrock.BedrockModel
+        llm = BedrockModel(
+            model_id=model_id,
+            streaming=True,
+            cache_tools="default" if tool_cache else None,
+            max_tokens=8192*5,
+            stop_sequences=["\n\nHuman"],
+            temperature=1 if enable_reasoning else 0.01,
+            additional_request_fields={
+                "thinking": {
+                    "type": "enabled" if enable_reasoning else "disabled",
+                    **({"budget_tokens": 8192} if enable_reasoning else {}),
+                }
+            },
+            boto_client_config=Config(
+                read_timeout=900,
+                connect_timeout=900,
+                retries=dict(max_attempts=50, mode="adaptive"),
             )
-        else:
-            raise ValueError(f"Unknown LLM type: {llm_type}")
+        )
 
         return llm
 
@@ -198,19 +172,19 @@ class strands_utils():
     def get_agent(**kwargs):
 
         agent_name, system_prompts = kwargs["agent_name"], kwargs["system_prompts"]
-        agent_type = kwargs.get("agent_type", "claude-sonnet-4-5")
+        model_id = kwargs.get("model_id", "claude-sonnet-4-5")
         enable_reasoning = kwargs.get("enable_reasoning", False)
         prompt_cache_info = kwargs.get("prompt_cache_info", (False, None)) # (True, "default")
         tool_cache = kwargs.get("tool_cache", False)
         tools = kwargs.get("tools", None)
         streaming = kwargs.get("streaming", True)
-        
+
         # Context management parameters for SummarizingConversationManager
         context_overflow_summary_ratio = kwargs.get("context_overflow_summary_ratio", 0.5)  # Summarize 50% of older messages
         context_overflow_preserve_recent_messages = kwargs.get("context_overflow_preserve_recent_messages", 10)  # Keep recent 10 messages
 
         prompt_cache, cache_type = prompt_cache_info
-        llm = strands_utils.get_model(llm_type=agent_type, enable_reasoning=enable_reasoning, tool_cache=tool_cache)
+        llm = strands_utils.get_model(llm_type=model_id, enable_reasoning=enable_reasoning, tool_cache=tool_cache)
         llm.config["streaming"] = streaming
 
         # Convert system_prompt to SystemContentBlock array with cachePoint if caching is enabled
@@ -394,10 +368,14 @@ class strands_utils():
 
             # If we found usage info, create and yield the event
             if usage_info:
+                # Extract model ID from agent
+                model_id = agent.model.config.get('model_id', 'unknown')
+
                 usage_event = {
                     "timestamp": datetime.now().isoformat(),
                     "session_id": session_id,
                     "agent_name": agent_name,
+                    "model_id": model_id,
                     "source": source or f"{agent_name}_node",
                     "type": "agent_usage_stream",
                     "event_type": "usage_metadata",
@@ -652,24 +630,28 @@ class TokenTracker:
             usage['cache_read_input_tokens'] += cache_read
             usage['cache_write_input_tokens'] += cache_write
 
-            # Track by agent
+            # Track by agent with model_id
             agent_name = event.get('agent_name')
+            model_id = event.get('model_id', 'unknown')
+
             if agent_name:
                 if agent_name not in usage['by_agent']:
                     usage['by_agent'][agent_name] = {
                         'input': 0,
                         'output': 0,
                         'cache_read': 0,
-                        'cache_write': 0
+                        'cache_write': 0,
+                        'model_id': model_id
                     }
                 usage['by_agent'][agent_name]['input'] += input_tokens
                 usage['by_agent'][agent_name]['output'] += output_tokens
                 usage['by_agent'][agent_name]['cache_read'] += cache_read
                 usage['by_agent'][agent_name]['cache_write'] += cache_write
+                usage['by_agent'][agent_name]['model_id'] = model_id  # Update model_id (in case it changes)
 
     @staticmethod
     def print_current(shared_state):
-        """Print current cumulative token usage."""
+        """Print current cumulative token usage with model information."""
         token_usage = shared_state.get('token_usage', {})
         if token_usage and token_usage.get('total_tokens', 0) > 0:
             total_input = token_usage.get('total_input_tokens', 0)
@@ -678,6 +660,111 @@ class TokenTracker:
             cache_read = token_usage.get('cache_read_input_tokens', 0)
             cache_write = token_usage.get('cache_write_input_tokens', 0)
 
+            # Get unique models used
+            by_agent = token_usage.get('by_agent', {})
+            models_used = set()
+            for agent_data in by_agent.values():
+                if 'model_id' in agent_data:
+                    models_used.add(agent_data['model_id'])
+
             # Display breakdown showing total includes all token types
             print(f"{TokenTracker.CYAN}>>> Cumulative Tokens (Total: {total:,}):{TokenTracker.END}")
+            if models_used:
+                print(f"{TokenTracker.CYAN}    Model(s): {', '.join(sorted(models_used))}{TokenTracker.END}")
             print(f"{TokenTracker.CYAN}    Regular Input: {total_input:,} | Cache Read: {cache_read:,} (90% off) | Cache Write: {cache_write:,} (25% extra) | Output: {total_output:,}{TokenTracker.END}")
+
+    @staticmethod
+    def print_summary(shared_state):
+        """Print detailed token usage summary with model and agent breakdown."""
+        print("\n" + "="*60)
+        print("=== Token Usage Summary ===")
+        print("="*60)
+
+        token_usage = shared_state.get('token_usage', {})
+
+        if not token_usage or token_usage.get('total_tokens', 0) == 0:
+            print("No token usage data available")
+            print("="*60)
+            return
+
+        total_input = token_usage.get('total_input_tokens', 0)
+        total_output = token_usage.get('total_output_tokens', 0)
+        total = token_usage.get('total_tokens', 0)
+        cache_read = token_usage.get('cache_read_input_tokens', 0)
+        cache_write = token_usage.get('cache_write_input_tokens', 0)
+
+        # Get unique models used
+        by_agent = token_usage.get('by_agent', {})
+        models_used = set()
+        for agent_data in by_agent.values():
+            if 'model_id' in agent_data:
+                models_used.add(agent_data['model_id'])
+
+        print(f"\nTotal Tokens: {total:,}")
+        if models_used:
+            print(f"Model(s) Used: {', '.join(sorted(models_used))}")
+        print(f"  - Regular Input:  {total_input:>8,} (100% cost)")
+        print(f"  - Cache Read:     {cache_read:>8,} (10% cost - 90% discount)")
+        print(f"  - Cache Write:    {cache_write:>8,} (125% cost - 25% extra)")
+        print(f"  - Output:         {total_output:>8,}")
+
+        # Model Usage Summary - aggregate by model
+        if by_agent:
+            print("\n" + "-"*60)
+            print("Model Usage Summary (for cost calculation):")
+            print("-"*60)
+
+            # Aggregate tokens by model
+            model_usage = {}
+            for agent_name, usage in by_agent.items():
+                model_id = usage.get('model_id', 'unknown')
+                if model_id not in model_usage:
+                    model_usage[model_id] = {
+                        'input': 0,
+                        'output': 0,
+                        'cache_read': 0,
+                        'cache_write': 0,
+                        'agents': []
+                    }
+                model_usage[model_id]['input'] += usage.get('input', 0)
+                model_usage[model_id]['output'] += usage.get('output', 0)
+                model_usage[model_id]['cache_read'] += usage.get('cache_read', 0)
+                model_usage[model_id]['cache_write'] += usage.get('cache_write', 0)
+                model_usage[model_id]['agents'].append(agent_name)
+
+            # Display model usage
+            for model_id in sorted(model_usage.keys()):
+                usage = model_usage[model_id]
+                model_total = usage['input'] + usage['output'] + usage['cache_read'] + usage['cache_write']
+                agents_str = ', '.join(usage['agents'])
+
+                print(f"\n  [{model_id}]")
+                print(f"    Total: {model_total:,}")
+                print(f"    - Regular Input:  {usage['input']:>8,} (100% cost)")
+                print(f"    - Cache Read:     {usage['cache_read']:>8,} (10% cost - 90% discount)")
+                print(f"    - Cache Write:    {usage['cache_write']:>8,} (125% cost - 25% extra)")
+                print(f"    - Output:         {usage['output']:>8,}")
+                print(f"    Used by: {agents_str}")
+
+            print("\n" + "-"*60)
+            print("Token Usage by Agent:")
+            print("-"*60)
+
+            # Sort agents for consistent display
+            for agent_name in sorted(by_agent.keys()):
+                usage = by_agent[agent_name]
+                input_tokens = usage.get('input', 0)
+                output_tokens = usage.get('output', 0)
+                agent_cache_read = usage.get('cache_read', 0)
+                agent_cache_write = usage.get('cache_write', 0)
+                agent_total = input_tokens + output_tokens + agent_cache_read + agent_cache_write
+                model_id = usage.get('model_id', 'unknown')
+
+                print(f"\n  [{agent_name}] Total: {agent_total:,}")
+                print(f"    Model: {model_id}")
+                print(f"    - Regular Input:  {input_tokens:>8,} (100% cost)")
+                print(f"    - Cache Read:     {agent_cache_read:>8,} (10% cost - 90% discount)")
+                print(f"    - Cache Write:    {agent_cache_write:>8,} (125% cost - 25% extra)")
+                print(f"    - Output:         {output_tokens:>8,}")
+
+        print("="*60)

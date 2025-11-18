@@ -1,13 +1,18 @@
 import logging
+import os
 import asyncio
 from typing import Any, Annotated
 from strands.types.tools import ToolResult, ToolUse
 from strands.types.content import ContentBlock
+from dotenv import load_dotenv
 from src.utils.strands_sdk_utils import strands_utils
 from src.prompts.template import apply_prompt_template
 from src.utils.common_utils import get_message_from_string
 from src.tools import python_repl_tool, bash_tool
+from strands_tools import file_read
 from src.utils.strands_sdk_utils import TokenTracker
+
+load_dotenv()
 
 # Simple logger setup
 logger = logging.getLogger(__name__)
@@ -19,15 +24,15 @@ class Colors:
     END = '\033[0m'
 
 TOOL_SPEC = {
-    "name": "coder_agent_tool",
-    "description": "Execute Python code and bash commands using a specialized coder agent. This tool provides access to a coder agent that can execute Python code for data analysis and calculations, run bash commands for system operations, and handle complex programming tasks.",
+    "name": "reporter_agent_tool",
+    "description": "Generate comprehensive reports based on analysis results using a specialized reporter agent. This tool provides access to a reporter agent that can read analysis results from artifacts, create structured reports with visualizations, and generate output in multiple formats (HTML, PDF, Markdown).",
     "inputSchema": {
         "json": {
             "type": "object",
             "properties": {
                 "task": {
                     "type": "string",
-                    "description": "The coding task or question that needs to be executed by the coder agent."
+                    "description": "The reporting task or instruction for generating the report (e.g., 'Create a comprehensive analysis report', 'Generate PDF report with all findings')."
                 }
             },
             "required": ["task"]
@@ -41,26 +46,27 @@ CLUES_FORMAT = "Here is clues from {}:\n\n<clues>\n{}\n</clues>\n\n"
 
 class Colors:
     GREEN = '\033[92m'
-    YELLOW = '\033[93m'
     END = '\033[0m'
 
-def handle_coder_agent_tool(task: Annotated[str, "The coding task or question that needs to be executed by the coder agent."]):
+def handle_reporter_agent_tool(_task: Annotated[str, "The reporting task or instruction for generating the report."]):
     """
-    Execute Python code and bash commands using a specialized coder agent.
+    Generate comprehensive reports based on analysis results using a specialized reporter agent.
 
-    This tool provides access to a coder agent that can:
-    - Execute Python code for data analysis and calculations
-    - Run bash commands for system operations
-    - Handle complex programming tasks
+    This tool provides access to a reporter agent that can:
+    - Read analysis results from artifacts directory
+    - Create structured reports with executive summaries, key findings, and detailed analysis
+    - Generate reports in multiple formats (HTML, PDF, Markdown)
+    - Include visualizations and charts in reports
+    - Process accumulated analysis results from all_results.txt
 
     Args:
-        task: The coding task or question that needs to be executed
+        task: The reporting task or instruction for generating the report
 
     Returns:
-        The result of the code execution or analysis
+        The generated report content and confirmation of file creation
     """
     print()  # Add newline before log
-    logger.info(f"\n{Colors.GREEN}Coder Agent Tool starting task{Colors.END}")
+    logger.info(f"\n{Colors.GREEN}Reporter Agent Tool starting{Colors.END}")
 
     # Try to extract shared state from global storage
     from src.graph.nodes import _global_node_states
@@ -73,15 +79,15 @@ def handle_coder_agent_tool(task: Annotated[str, "The coding task or question th
     request_prompt, full_plan = shared_state.get("request_prompt", ""), shared_state.get("full_plan", "")
     clues, messages = shared_state.get("clues", ""), shared_state.get("messages", [])
 
-    # Create coder agent with specialized tools using consistent pattern
-    coder_agent = strands_utils.get_agent(
-        agent_name="coder",
-        system_prompts=apply_prompt_template(prompt_name="coder", prompt_context={"USER_REQUEST": request_prompt, "FULL_PLAN": full_plan}),
-        agent_type="claude-sonnet-4-5", # claude-sonnet-3-5-v-2, claude-sonnet-3-7, claude-sonnet-4
+    # Create reporter agent with specialized tools using consistent pattern
+    reporter_agent = strands_utils.get_agent(
+        agent_name="reporter",
+        system_prompts=apply_prompt_template(prompt_name="reporter", prompt_context={"USER_REQUEST": request_prompt, "FULL_PLAN": full_plan}),
+        model_id=os.getenv("REPORTER_MODEL_ID", os.getenv("DEFAULT_MODEL_ID")),
         enable_reasoning=False,
-        prompt_cache_info=(True, "default"),  # reasoning agent uses prompt caching
+        prompt_cache_info=(True, "default"), # reasoning agent uses prompt caching
         tool_cache=True,
-        tools=[python_repl_tool, bash_tool],
+        tools=[python_repl_tool, bash_tool, file_read],
         streaming=True  # Enable streaming for consistency
     )
 
@@ -93,10 +99,10 @@ def handle_coder_agent_tool(task: Annotated[str, "The coding task or question th
     message = [ContentBlock(text=message), ContentBlock(cachePoint={"type": "default"})]  # Cache point for messages caching
 
     # Process streaming response and collect text in one pass
-    async def process_coder_stream():
+    async def process_reporter_stream():
         full_text = ""
         async for event in strands_utils.process_streaming_response_yield(
-            coder_agent, message, agent_name="coder", source="coder_tool"
+            reporter_agent, message, agent_name="reporter", source="reporter_tool"
         ):
             if event.get("event_type") == "text_chunk":
                 full_text += event.get("data", "")
@@ -104,36 +110,36 @@ def handle_coder_agent_tool(task: Annotated[str, "The coding task or question th
             TokenTracker.accumulate(event, shared_state)
         return {"text": full_text}
 
-    response = asyncio.run(process_coder_stream())
+    response = asyncio.run(process_reporter_stream())
     result_text = response['text']
 
     # Update clues
-    clues = '\n\n'.join([clues, CLUES_FORMAT.format("coder", response["text"])])
+    clues = '\n\n'.join([clues, CLUES_FORMAT.format("reporter", response["text"])])
 
     # Update history
     history = shared_state.get("history", [])
-    history.append({"agent":"coder", "message": response["text"]})
+    history.append({"agent":"reporter", "message": response["text"]})
 
     # Update shared state
-    shared_state['messages'] = [get_message_from_string(role="user", string=RESPONSE_FORMAT.format("coder", response["text"]), imgs=[])]
+    shared_state['messages'] = [get_message_from_string(role="user", string=RESPONSE_FORMAT.format("reporter", response["text"]), imgs=[])]
     shared_state['clues'] = clues
     shared_state['history'] = history
 
-    logger.info(f"\n{Colors.GREEN}Coder Agent Tool completed successfully{Colors.END}")
+    logger.info(f"\n{Colors.GREEN}Reporter Agent Tool completed{Colors.END}")
     # Print token usage using TokenTracker
     TokenTracker.print_current(shared_state)
     return result_text
 
 # Function name must match tool name
-def coder_agent_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
+def reporter_agent_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     task = tool["input"]["task"]
-
-    # Use the existing handle_coder_agent_tool function
-    result = handle_coder_agent_tool(task)
-
+    
+    # Use the existing handle_reporter_agent_tool function
+    result = handle_reporter_agent_tool(task)
+    
     # Check if execution was successful based on the result string
-    if "Error in coder agent tool" in result:
+    if "Error in reporter agent tool" in result:
         return {
             "toolUseId": tool_use_id,
             "status": "error",

@@ -1,8 +1,10 @@
 import logging
+import os
 import asyncio
 from typing import Any, Annotated, Dict, List
 from strands.types.tools import ToolResult, ToolUse
 from strands.types.content import ContentBlock
+from dotenv import load_dotenv
 from src.utils.strands_sdk_utils import strands_utils
 from src.prompts.template import apply_prompt_template
 from src.utils.common_utils import get_message_from_string
@@ -12,7 +14,6 @@ from src.utils.strands_sdk_utils import TokenTracker
 from src.tools import python_repl_tool, bash_tool
 from strands_tools import file_read
 
-from dotenv import load_dotenv
 load_dotenv()
 
 # Simple logger setup
@@ -147,10 +148,10 @@ def handle_validator_agent_tool(_task: Annotated[str, "The validation task or in
     validator_agent = strands_utils.get_agent(
         agent_name="validator",
         system_prompts=apply_prompt_template(prompt_name="validator", prompt_context={"USER_REQUEST": request_prompt, "FULL_PLAN": full_plan}),
-        agent_type="claude-sonnet-4-5", # claude-sonnet-3-5-v-2, claude-sonnet-3-7
+        model_id=os.getenv("VALIDATOR_MODEL_ID", os.getenv("DEFAULT_MODEL_ID")),
         enable_reasoning=False,
-        prompt_cache_info=(True, "default"), # reasoning agent uses prompt caching
-        tool_cache=True,
+        prompt_cache_info=(False, None), # reasoning agent uses prompt caching
+        tool_cache=False,
         tools=[python_repl_tool, bash_tool, file_read],
         streaming=True  # Enable streaming for consistency
     )

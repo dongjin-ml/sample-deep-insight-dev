@@ -15,9 +15,9 @@
 
   <p>
     <a href="#why-deep-insight">Why Deep Insight?</a>
-    ◆ <a href="#deployment-options">Deployment Options</a>
     ◆ <a href="#quick-start">Quick Start</a>
     ◆ <a href="#demo">Demo</a>
+    ◆ <a href="#installation">Installation</a>
     ◆ <a href="#architecture">Architecture</a>
   </p>
 </div>
@@ -38,42 +38,12 @@ Transform weeks of manual reporting work into minutes using hierarchical multi-a
 - **📊 Transparency & Verifiability** - Reports with calculation methods, sources, and reasoning processes
 - **🚀 Beyond Reporting** - Extend to any agent use case: shopping, support, log analysis, and more
 
-## Deployment Options
-
-Deep Insight supports two deployment models to fit your operational needs:
-
-| Feature | Self-Hosted | Managed AgentCore |
-|---------|-------------|-------------------|
-| **Infrastructure** | Your AWS VPC | AWS Managed Service |
-| **Customization** | Full code access | Configuration-based |
-| **Setup Complexity** | Medium | Low |
-| **Maintenance** | Self-managed | AWS-managed |
-| **Best For** | Custom workflows, full control | Quick deployment, minimal ops |
-
-### Self-Hosted
-
-Deploy Deep Insight in your own AWS VPC with complete code access and customization capabilities. Ideal for enterprises requiring full control over agents, prompts, and infrastructure.
-
-📁 **Location**: [`./self-hosted/`](./self-hosted/)
-
-### Managed AgentCore
-
-Use AWS-managed infrastructure with simplified configuration. Get started quickly with minimal operational overhead while leveraging the same powerful multi-agent architecture.
-
-📁 **Location**: [`./managed-agentcore/`](./managed-agentcore/)
-
----
-
 ## Quick Start
 
-Choose your preferred deployment option:
-
-### Option 1: Self-Hosted
-
 ```bash
-# 1. Clone and navigate to self-hosted
-git clone <repository-url>
-cd sample-deep-insight/self-hosted
+# 1. Clone and setup environment
+git clone https://github.com/aws-samples/aws-ai-ml-workshop-kr.git
+cd aws-ai-ml-workshop-kr/genai/aws-gen-ai-kr/20_applications/08_bedrock_manus/use_cases/06_insight_extractor_strands_sdk_workshop_phase_1
 cd setup/ && ./create-uv-env.sh deep-insight 3.12 && cd ..
 
 # 2. Configure AWS credentials
@@ -86,25 +56,7 @@ uv run python main.py --user_query "Create a sales performance report for Moon M
 
 > **Prerequisites**: Python 3.12+, AWS credentials with Bedrock access (tested in us-west-2 region)
 >
-> **Need more options?** See [Installation](#installation) section below for detailed setup instructions.
-
-### Option 2: Managed AgentCore
-
-```bash
-# 1. Clone and navigate to managed-agentcore
-git clone <repository-url>
-cd sample-deep-insight/managed-agentcore
-
-# 2. Configure your agent
-# Follow the setup instructions in the managed-agentcore directory
-
-# 3. Deploy and run
-# Detailed instructions available in ./managed-agentcore/README.md
-```
-
-> **Prerequisites**: AWS account with AgentCore access
->
-> **Need help?** See the [managed-agentcore README](./managed-agentcore/README.md) for detailed setup instructions.
+> **Need more options?** See [Installation](#installation) section below for detailed setup instructions and alternative configuration methods.
 
 ## Demo
 
@@ -122,9 +74,7 @@ cd sample-deep-insight/managed-agentcore
 
 ## Installation
 
-This section provides detailed installation instructions for the **Self-Hosted** deployment option. For Managed AgentCore setup, see the [managed-agentcore README](./managed-agentcore/README.md).
-
-For a quick 3-step setup, see [Quick Start](#quick-start) above.
+This section provides detailed installation instructions and alternative configuration options. For a quick 3-step setup, see [Quick Start](#quick-start) above.
 
 ### Environment Setup
 

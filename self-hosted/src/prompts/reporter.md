@@ -181,6 +181,7 @@ def add_paragraph(doc, text):
     para.paragraph_format.space_before = Pt(0)
     para.paragraph_format.space_after = Pt(8)
     para.paragraph_format.line_spacing = 1.15
+    para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY  # Justify text alignment
     return para
 
 # === STEP 1 EXECUTION ===
@@ -241,12 +242,18 @@ def add_paragraph(doc, text):
     para.paragraph_format.space_before = Pt(0)
     para.paragraph_format.space_after = Pt(8)
     para.paragraph_format.line_spacing = 1.15
+    para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY  # Justify text alignment
     return para
 
 def add_image_with_caption(doc, image_path, caption_text):
-    """Add image and caption"""
+    """Add image (centered) and caption"""
     if os.path.exists(image_path):
+        # Add image
         doc.add_picture(image_path, width=Inches(5.5))
+        # Center the image paragraph (last paragraph contains the image)
+        last_paragraph = doc.paragraphs[-1]
+        last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Add caption
         caption = doc.add_paragraph()
         caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
         caption_run = caption.add_run(caption_text)
@@ -498,14 +505,20 @@ Standard sections (build incrementally):
 - H1 (Title): 24pt, Bold, Centered, Blue (#2c5aa0)
 - H2 (Section): 18pt, Bold, Dark Gray (#34495e)
 - H3 (Subsection): 16pt, Bold, Dark (#2c3e50)
-- Body: 10.5pt, Normal, Dark (#2c3e50)
+- Body: 10.5pt, Normal, Dark (#2c3e50), Justified
 - Table Headers: 14pt, Bold
 - Table Data: 13pt, Normal
-- Image Captions: 9pt, Italic, Gray (#7f8c8d)
+- Image Captions: 9pt, Italic, Gray (#7f8c8d), Centered
+
+**Alignment**:
+- Body text: Justified (both left and right aligned)
+- Images: Centered
+- Image captions: Centered
+- H1 titles: Centered
 
 **Spacing**:
 - Paragraph: space_before=0pt, space_after=8pt, line_spacing=1.15
-- Images: width=Inches(5.5)
+- Images: width=Inches(5.5), centered
 - Page margins: Top/Bottom 2.54cm, Left/Right 3.17cm
 
 **Korean Font**: Always use 'Malgun Gothic' with East Asian settings:

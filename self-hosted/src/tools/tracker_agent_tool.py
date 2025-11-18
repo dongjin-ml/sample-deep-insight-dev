@@ -1,11 +1,15 @@
 import logging
+import os
 import asyncio
 from typing import Any, Annotated
 from strands.types.tools import ToolResult, ToolUse
+from dotenv import load_dotenv
 from src.utils.strands_sdk_utils import strands_utils
 from src.prompts.template import apply_prompt_template
 from src.utils.common_utils import get_message_from_string
 from src.utils.strands_sdk_utils import TokenTracker
+
+load_dotenv()
 
 # Simple logger setup
 logger = logging.getLogger(__name__)
@@ -88,7 +92,7 @@ def handle_tracker_agent_tool(completed_agent: Annotated[str, "The name of the a
                 "FULL_PLAN": full_plan
             }
         ),
-        agent_type="claude-sonnet-4-5", # claude-sonnet-3-5-v-2, claude-sonnet-3-7
+        model_id=os.getenv("TRACKER_MODEL_ID", os.getenv("DEFAULT_MODEL_ID")),
         enable_reasoning=False,
         prompt_cache_info=(False, None),  # reasoning agent uses prompt caching
         tool_cache=False,
