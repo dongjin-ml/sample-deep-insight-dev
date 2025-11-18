@@ -2,15 +2,21 @@ import logging
 import asyncio
 from typing import Any, Annotated
 from strands.types.tools import ToolResult, ToolUse
+from strands.types.content import ContentBlock
 from src.utils.strands_sdk_utils import strands_utils
 from src.prompts.template import apply_prompt_template
 from src.utils.common_utils import get_message_from_string
 from src.tools import python_repl_tool, bash_tool
-
+from src.utils.strands_sdk_utils import TokenTracker
 
 # Simple logger setup
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+class Colors:
+    GREEN = '\033[92m'
+    CYAN = '\033[96m'
+    END = '\033[0m'
 
 TOOL_SPEC = {
     "name": "coder_agent_tool",
@@ -74,6 +80,7 @@ def handle_coder_agent_tool(task: Annotated[str, "The coding task or question th
         agent_type="claude-sonnet-4-5", # claude-sonnet-3-5-v-2, claude-sonnet-3-7, claude-sonnet-4
         enable_reasoning=False,
         prompt_cache_info=(True, "default"),  # reasoning agent uses prompt caching
+        tool_cache=True,
         tools=[python_repl_tool, bash_tool],
         streaming=True  # Enable streaming for consistency
     )
@@ -81,13 +88,20 @@ def handle_coder_agent_tool(task: Annotated[str, "The coding task or question th
     # Prepare message with context if available
     message = '\n\n'.join([messages[-1]["content"][-1]["text"], clues])
 
+    # Create message with cache point for messages caching
+    # This caches the large context (clues) for cost savings
+    message = [ContentBlock(text=message), ContentBlock(cachePoint={"type": "default"})]  # Cache point for messages caching
+
     # Process streaming response and collect text in one pass
     async def process_coder_stream():
         full_text = ""
         async for event in strands_utils.process_streaming_response_yield(
             coder_agent, message, agent_name="coder", source="coder_tool"
         ):
-            if event.get("event_type") == "text_chunk": full_text += event.get("data", "")
+            if event.get("event_type") == "text_chunk":
+                full_text += event.get("data", "")
+            # Accumulate token usage
+            TokenTracker.accumulate(event, shared_state)
         return {"text": full_text}
 
     response = asyncio.run(process_coder_stream())
@@ -106,6 +120,8 @@ def handle_coder_agent_tool(task: Annotated[str, "The coding task or question th
     shared_state['history'] = history
 
     logger.info(f"\n{Colors.GREEN}Coder Agent Tool completed successfully{Colors.END}")
+    # Print token usage using TokenTracker
+    TokenTracker.print_current(shared_state)
     return result_text
 
 # Function name must match tool name

@@ -40,7 +40,7 @@ def handle_bash_tool(cmd: Annotated[str, "The bash command to be executed."]):
     try:
         # Execute the command and capture output
         result = subprocess.run(
-            ["bash", "-c", cmd], check=True, text=True, capture_output=True
+            cmd, shell=True, check=True, text=True, capture_output=True
         )
         # Return stdout as the result
         results = "||".join([cmd, result.stdout])

@@ -20,7 +20,7 @@ pillow>=11.3.0
 
 # AWS and web services
 boto3==1.40.10
-requests>=2.32.0
+requests==2.31.0
 requests-toolbelt>=1.0.0
 
 # Development and utilities

@@ -37,11 +37,6 @@ COPY . .
 EXPOSE 8080
 
 # 헬스체크 설정
-# 보안을 위해 non-root 사용자 생성 및 사용
-RUN adduser --disabled-password --gecos '' appuser && \
-    chown -R appuser:appuser /app
-USER appuser
-
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 

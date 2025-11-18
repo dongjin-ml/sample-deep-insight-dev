@@ -77,34 +77,43 @@ def execute_python(code, timeout):
     start_time = time.time()
     
     try:
-        # uv add 명령어 처리 - 안전한 패키지 설치 (권장)
-        if code.strip().startswith('!uv add') or code.strip().startswith('uv add'):
+        # pip install 명령어 처리
+        if code.strip().startswith('!pip install') or code.strip().startswith('pip install'):
             clean_code = code.strip()
             if clean_code.startswith('!'):
                 clean_code = clean_code[1:]
             
-            # 입력 검증: uv add 명령어만 허용
-            cmd_parts = clean_code.split()
-            if len(cmd_parts) < 3 or cmd_parts[0] != 'uv' or cmd_parts[1] != 'add':
-                return jsonify({
-                    "output": "Error: Only 'uv add' commands are allowed",
-                    "status": "error",
-                    "execution_time": time.time() - start_time
-                })
-            
-            # 위험한 패키지 차단
-            dangerous_packages = ['os', 'subprocess', 'sys', 'importlib', '__import__']
-            package_name = cmd_parts[2].split('==')[0].split('>=')[0].split('<=')[0]
-            if any(dangerous in package_name.lower() for dangerous in dangerous_packages):
-                return jsonify({
-                    "output": f"Error: Package '{package_name}' is not allowed for security reasons",
-                    "status": "error",
-                    "execution_time": time.time() - start_time
-                })
-            
-            # 안전한 uv add 실행
             result = subprocess.run(
-                ['uv', 'add'] + cmd_parts[2:],
+                clean_code.split(),
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+            
+            output = result.stdout + result.stderr
+            
+            # 설치된 패키지 추적
+            if result.returncode == 0 and 'install' in clean_code:
+                package_name = extract_package_name(clean_code)
+                if package_name:
+                    installed_packages.add(package_name)
+            
+            return jsonify({
+                "output": output,
+                "status": "success" if result.returncode == 0 else "error",
+                "execution_time": time.time() - start_time,
+                "return_code": result.returncode
+            })
+        
+        # apt 명령어 처리
+        elif code.strip().startswith('!apt') or code.strip().startswith('apt'):
+            clean_code = code.strip()
+            if clean_code.startswith('!'):
+                clean_code = clean_code[1:]
+            
+            result = subprocess.run(
+                clean_code,
+                shell=True,
                 capture_output=True,
                 text=True,
                 timeout=timeout
@@ -118,79 +127,10 @@ def execute_python(code, timeout):
                 "execution_time": time.time() - start_time,
                 "return_code": result.returncode
             })
-
-        # pip install 명령어 처리 - uv 사용 권장 안내
-        if code.strip().startswith('!pip install') or code.strip().startswith('pip install'):
-            return jsonify({
-                "output": "Note: This environment uses uv for package management. Please use 'uv add <package>' for better dependency management, or pip install will work but is not recommended.",
-                "status": "info",
-                "execution_time": time.time() - start_time
-            })
-        if code.strip().startswith('!pip install') or code.strip().startswith('pip install'):
-            clean_code = code.strip()
-            if clean_code.startswith('!'):
-                clean_code = clean_code[1:]
-            
-            # 입력 검증: pip install 명령어만 허용
-            cmd_parts = clean_code.split()
-            if len(cmd_parts) < 3 or cmd_parts[0] != 'pip' or cmd_parts[1] != 'install':
-                return jsonify({
-                    "output": "Error: Only 'pip install' commands are allowed",
-                    "status": "error",
-                    "execution_time": time.time() - start_time
-                })
-            
-            # 위험한 패키지 차단
-            dangerous_packages = ['os', 'subprocess', 'sys', 'importlib', '__import__']
-            package_name = cmd_parts[2].split('==')[0].split('>=')[0].split('<=')[0]
-            if any(dangerous in package_name.lower() for dangerous in dangerous_packages):
-                return jsonify({
-                    "output": f"Error: Package '{package_name}' is not allowed for security reasons",
-                    "status": "error",
-                    "execution_time": time.time() - start_time
-                })
-            
-            # 안전한 pip install 실행
-            result = subprocess.run(
-                ['pip', 'install'] + cmd_parts[2:],
-                capture_output=True,
-                text=True,
-                timeout=timeout
-            )
-                package_name = extract_package_name(clean_code)
-                if package_name:
-                    installed_packages.add(package_name)
-            
-            return jsonify({
-                "output": output,
-                "status": "success" if result.returncode == 0 else "error",
-                "execution_time": time.time() - start_time,
-                "return_code": result.returncode
-            })
-        
-        # apt 명령어 처리 - 보안상 비활성화
-        elif code.strip().startswith('!apt') or code.strip().startswith('apt'):
-            return jsonify({
-                "output": "apt commands are disabled for security reasons",
-                "status": "error",
-                "execution_time": time.time() - start_time
-            })
-            
-            return jsonify({
-                "output": output,
-                "status": "success" if result.returncode == 0 else "error",
-                "execution_time": time.time() - start_time,
-                "return_code": result.returncode
-            })
         
         # 일반 Python 코드 실행
         else:
-            # exec 사용 제거 - 보안상 Python 코드 실행 비활성화
-            return jsonify({
-                "output": "Python code execution is disabled for security reasons. Please use pip install or bash commands only.",
-                "status": "error",
-                "execution_time": time.time() - start_time
-            })
+            exec(code, python_globals, python_locals)
             
             output = captured_stdout.getvalue()
             error_output = captured_stderr.getvalue()
@@ -223,12 +163,42 @@ def execute_python(code, timeout):
         sys.stderr = old_stderr
 
 def execute_bash(command, timeout):
-    """Bash 명령어 실행 - 보안상 비활성화"""
-    return jsonify({
-        "output": "Bash command execution is disabled for security reasons",
-        "status": "error",
-        "execution_time": 0
-    })
+    """Bash 명령어 실행"""
+    start_time = time.time()
+    
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd="/app"
+        )
+        
+        output = result.stdout
+        if result.stderr:
+            output += "\n" + result.stderr
+        
+        return jsonify({
+            "output": output,
+            "status": "success" if result.returncode == 0 else "error",
+            "execution_time": time.time() - start_time,
+            "return_code": result.returncode
+        })
+        
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            "output": f"Command timed out after {timeout} seconds",
+            "status": "timeout",
+            "execution_time": time.time() - start_time
+        })
+    except Exception as e:
+        return jsonify({
+            "output": f"Command execution error: {str(e)}",
+            "status": "error",
+            "execution_time": time.time() - start_time
+        })
 
 def extract_package_name(install_command):
     """pip install 명령에서 패키지명 추출"""
