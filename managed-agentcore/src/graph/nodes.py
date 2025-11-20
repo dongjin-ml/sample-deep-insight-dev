@@ -92,11 +92,11 @@ async def coordinator_node(task=None, **kwargs):
         if isinstance(task, dict):
             request = task.get("request", "")
             request_prompt = task.get("request_prompt", request)
-            csv_file_path = task.get("csv_file_path")  # Extract CSV file path
+            data_directory = task.get("data_directory")  # Directory upload
         else:
             request = str(task) if task else ""
             request_prompt = request
-            csv_file_path = None
+            data_directory = None
 
         agent = strands_utils.get_agent(
             agent_name="coordinator",
@@ -127,7 +127,13 @@ async def coordinator_node(task=None, **kwargs):
         shared_state['messages'] = agent.messages
         shared_state['request'] = request
         shared_state['request_prompt'] = request_prompt
-        shared_state['csv_file_path'] = csv_file_path  # Store CSV file path for Fargate tools
+
+        # Store data directory
+        if data_directory:
+            shared_state['data_directory'] = data_directory
+            logger.info(f"📂 Shared state: data_directory = {data_directory}")
+        else:
+            shared_state['data_directory'] = None
 
         # Build and update history
         if 'history' not in shared_state:

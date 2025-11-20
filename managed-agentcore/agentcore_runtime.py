@@ -236,6 +236,203 @@ def _print_conversation_history() -> None:
     else:
         print("No conversation history found")
 
+def _print_token_usage_summary() -> None:
+    """
+    Print final token usage statistics across all agents.
+
+    Displays comprehensive token usage breakdown including:
+    - Total tokens by agent
+    - Model usage per agent
+    - Cache hit/write statistics
+    - Cost optimization insights
+    """
+    from src.graph.nodes import _global_node_states
+    from src.utils.strands_sdk_utils import TokenTracker
+
+    shared_state = _global_node_states.get('shared', {})
+    TokenTracker.print_summary(shared_state)
+
+def _save_token_usage_to_s3(request_id: str) -> None:
+    """
+    Save token usage statistics directly to S3.
+
+    Uploads token usage files to S3:
+    - s3://{bucket}/deep-insight/fargate_sessions/{session_id}/output/token_usage.json
+    - s3://{bucket}/deep-insight/fargate_sessions/{session_id}/output/token_usage.txt
+
+    Args:
+        request_id (str): Request identifier to retrieve session ID
+    """
+    import json
+    from datetime import datetime
+    from src.graph.nodes import _global_node_states
+    from src.tools.global_fargate_coordinator import get_global_session
+    import boto3
+
+    shared_state = _global_node_states.get('shared', {})
+    token_usage = shared_state.get('token_usage', {})
+
+    if not token_usage or token_usage.get('total_tokens', 0) == 0:
+        print(f"⚠️ No token usage data to save for request {request_id}", flush=True)
+        return
+
+    # Get session ID from Fargate session manager
+    fargate_manager = get_global_session()
+    session_id = None
+
+    if request_id in fargate_manager._sessions:
+        session_id = fargate_manager._sessions[request_id]['session_id']
+
+    if not session_id:
+        print(f"⚠️ No session ID found for request {request_id}, using request_id as fallback", flush=True)
+        session_id = request_id
+
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # Prepare token usage data
+    json_data = {
+        "session_id": session_id,
+        "request_id": request_id,
+        "timestamp": timestamp,
+        "summary": {
+            "total_tokens": token_usage.get('total_tokens', 0),
+            "total_input_tokens": token_usage.get('total_input_tokens', 0),
+            "total_output_tokens": token_usage.get('total_output_tokens', 0),
+            "cache_read_input_tokens": token_usage.get('cache_read_input_tokens', 0),
+            "cache_write_input_tokens": token_usage.get('cache_write_input_tokens', 0)
+        },
+        "by_agent": token_usage.get('by_agent', {})
+    }
+
+    # Build text content
+    text_lines = []
+    text_lines.append("=" * 60)
+    text_lines.append("Token Usage Summary")
+    text_lines.append("=" * 60)
+    text_lines.append(f"\nSession ID: {session_id}")
+    text_lines.append(f"Request ID: {request_id}")
+    text_lines.append(f"Timestamp: {timestamp}")
+    text_lines.append("\n" + "-" * 60)
+    text_lines.append("Overall Statistics")
+    text_lines.append("-" * 60)
+
+    total_input = token_usage.get('total_input_tokens', 0)
+    total_output = token_usage.get('total_output_tokens', 0)
+    total = token_usage.get('total_tokens', 0)
+    cache_read = token_usage.get('cache_read_input_tokens', 0)
+    cache_write = token_usage.get('cache_write_input_tokens', 0)
+
+    # Get unique models used
+    by_agent = token_usage.get('by_agent', {})
+    models_used = set()
+    for agent_data in by_agent.values():
+        if 'model_id' in agent_data:
+            models_used.add(agent_data['model_id'])
+
+    text_lines.append(f"\nTotal Tokens: {total:,}")
+    if models_used:
+        text_lines.append(f"Model(s) Used: {', '.join(sorted(models_used))}")
+    text_lines.append(f"  - Regular Input:  {total_input:>10,} (100% cost)")
+    text_lines.append(f"  - Cache Read:     {cache_read:>10,} (10% cost - 90% discount)")
+    text_lines.append(f"  - Cache Write:    {cache_write:>10,} (125% cost - 25% extra)")
+    text_lines.append(f"  - Output:         {total_output:>10,}")
+
+    # Model Usage Summary - aggregate by model
+    if by_agent:
+        text_lines.append("\n" + "-" * 60)
+        text_lines.append("Model Usage Summary (for cost calculation)")
+        text_lines.append("-" * 60)
+
+        # Aggregate tokens by model
+        model_usage = {}
+        for agent_name, usage in by_agent.items():
+            model_id = usage.get('model_id', 'unknown')
+            if model_id not in model_usage:
+                model_usage[model_id] = {
+                    'input': 0,
+                    'output': 0,
+                    'cache_read': 0,
+                    'cache_write': 0,
+                    'agents': []
+                }
+            model_usage[model_id]['input'] += usage.get('input', 0)
+            model_usage[model_id]['output'] += usage.get('output', 0)
+            model_usage[model_id]['cache_read'] += usage.get('cache_read', 0)
+            model_usage[model_id]['cache_write'] += usage.get('cache_write', 0)
+            model_usage[model_id]['agents'].append(agent_name)
+
+        # Display model usage
+        for model_id in sorted(model_usage.keys()):
+            usage = model_usage[model_id]
+            model_total = usage['input'] + usage['output'] + usage['cache_read'] + usage['cache_write']
+            agents_str = ', '.join(usage['agents'])
+
+            text_lines.append(f"\n  [{model_id}]")
+            text_lines.append(f"    Total: {model_total:,}")
+            text_lines.append(f"    - Regular Input:  {usage['input']:>10,} (100% cost)")
+            text_lines.append(f"    - Cache Read:     {usage['cache_read']:>10,} (10% cost - 90% discount)")
+            text_lines.append(f"    - Cache Write:    {usage['cache_write']:>10,} (125% cost - 25% extra)")
+            text_lines.append(f"    - Output:         {usage['output']:>10,}")
+            text_lines.append(f"    Used by: {agents_str}")
+
+        text_lines.append("\n" + "-" * 60)
+        text_lines.append("Token Usage by Agent")
+        text_lines.append("-" * 60)
+
+        for agent_name in sorted(by_agent.keys()):
+            usage = by_agent[agent_name]
+            input_tokens = usage.get('input', 0)
+            output_tokens = usage.get('output', 0)
+            agent_cache_read = usage.get('cache_read', 0)
+            agent_cache_write = usage.get('cache_write', 0)
+            agent_total = input_tokens + output_tokens + agent_cache_read + agent_cache_write
+            model_id = usage.get('model_id', 'unknown')
+
+            text_lines.append(f"\n[{agent_name}] Total: {agent_total:,}")
+            text_lines.append(f"  Model: {model_id}")
+            text_lines.append(f"  - Regular Input:  {input_tokens:>10,} (100% cost)")
+            text_lines.append(f"  - Cache Read:     {agent_cache_read:>10,} (10% cost - 90% discount)")
+            text_lines.append(f"  - Cache Write:    {agent_cache_write:>10,} (125% cost - 25% extra)")
+            text_lines.append(f"  - Output:         {output_tokens:>10,}")
+
+    text_lines.append("\n" + "=" * 60)
+    text_content = "\n".join(text_lines)
+
+    # Upload directly to S3 (no local files)
+    try:
+        s3_bucket = os.getenv('S3_BUCKET_NAME')
+        aws_region = os.getenv('AWS_REGION', 'us-east-1')
+
+        if not s3_bucket:
+            print(f"⚠️ S3_BUCKET_NAME not set, skipping S3 upload", flush=True)
+            return
+
+        s3_client = boto3.client('s3', region_name=aws_region)
+        s3_prefix = f"deep-insight/fargate_sessions/{session_id}/output/"
+
+        # Upload JSON directly to S3
+        s3_json_key = f"{s3_prefix}token_usage.json"
+        s3_client.put_object(
+            Bucket=s3_bucket,
+            Key=s3_json_key,
+            Body=json.dumps(json_data, indent=2, ensure_ascii=False),
+            ContentType='application/json'
+        )
+        print(f"✅ Token usage uploaded to S3: s3://{s3_bucket}/{s3_json_key}", flush=True)
+
+        # Upload TXT directly to S3
+        s3_txt_key = f"{s3_prefix}token_usage.txt"
+        s3_client.put_object(
+            Bucket=s3_bucket,
+            Key=s3_txt_key,
+            Body=text_content,
+            ContentType='text/plain'
+        )
+        print(f"✅ Token usage uploaded to S3: s3://{s3_bucket}/{s3_txt_key}", flush=True)
+
+    except Exception as e:
+        print(f"⚠️ Failed to upload token usage to S3: {e}", flush=True)
+
 def _generate_request_id() -> str:
     """
     Generate and print unique request ID for tracking.
@@ -300,28 +497,17 @@ def _extract_user_query(payload: Dict[str, Any]) -> str:
 
     return user_query
 
-def _extract_csv_path_from_prompt(prompt: str) -> str:
+def _extract_data_directory_from_payload(payload: Dict[str, Any]) -> str:
     """
-    Extract CSV file path from user prompt using regex.
-
-    Searches for file paths ending with .csv in the prompt text.
-    Supports both relative and absolute paths.
+    Extract data directory from payload parameter.
 
     Args:
-        prompt (str): User's prompt text
+        payload (dict): Request payload from AgentCore
 
     Returns:
-        str: Extracted CSV file path, or None if not found
-
-    Examples:
-        "./data/file.csv 파일 분석해줘" → "./data/file.csv"
-        "Read /home/user/data.csv and analyze" → "/home/user/data.csv"
+        str: Data directory path, or None if not provided
     """
-    import re
-    # Match file paths ending with .csv
-    # Supports: ./path/file.csv, /absolute/path/file.csv, relative/file.csv
-    match = re.search(r'([./\w\-]+\.csv)', prompt)
-    return match.group(1) if match else None
+    return payload.get("data_directory")
 
 def _build_graph_input(user_query: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -329,11 +515,8 @@ def _build_graph_input(user_query: str, payload: Dict[str, Any]) -> Dict[str, An
 
     Constructs complete input dictionary for graph execution including:
     - User query and formatted prompt (for LLM understanding)
-    - Extracted CSV file path (for system S3 upload to Fargate)
+    - Data directory for S3 upload to Fargate
     - AgentCore metadata (runtime info, version, features)
-
-    The CSV file path is extracted from the user prompt automatically.
-    This allows natural language queries while enabling system-level file handling.
 
     Args:
         user_query (str): User's query string
@@ -350,12 +533,11 @@ def _build_graph_input(user_query: str, payload: Dict[str, Any]) -> Dict[str, An
         "runtime_source": RUNTIME_SOURCE
     }
 
-    # Extract CSV file path from prompt (if mentioned)
-    # Priority: 1. Explicit payload parameter, 2. Extracted from prompt
-    csv_file_path = payload.get("csv_file_path") or _extract_csv_path_from_prompt(user_query)
-    graph_input["csv_file_path"] = csv_file_path
-    if csv_file_path:
-        print(f"📂 Extracted CSV file path: {csv_file_path}", flush=True)
+    # Extract data directory from payload parameter
+    data_directory = payload.get("data_directory")
+    if data_directory:
+        graph_input["data_directory"] = data_directory
+        print(f"📂 Using data directory: {data_directory}", flush=True)
 
     # Add AgentCore metadata
     agentcore_metadata = payload.get("agentcore_metadata", {
@@ -471,6 +653,11 @@ async def agentcore_streaming_execution(
 
             # Step 6: Print conversation history and completion
             _print_conversation_history()
+            _print_token_usage_summary()
+
+            # Step 6.5: Save token usage directly to S3
+            _save_token_usage_to_s3(request_id)
+
             print("=== AgentCore Runtime Event Stream Complete ===")
 
             # Step 7: Record observability metrics

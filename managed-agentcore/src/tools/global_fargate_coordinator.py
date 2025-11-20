@@ -37,7 +37,7 @@ Key Features:
        - Per-request failure tracking with limits
 
     5. S3 Data Synchronization
-       - CSV file upload with session ID prefixes
+       - Directory upload with session ID prefixes
        - Container file sync via HTTP API
        - Automatic cleanup on session completion
 
@@ -49,11 +49,11 @@ Usage Example:
     # Set request context (required)
     session_mgr.set_request_context("request-123")
 
-    # Create session with data
-    success = session_mgr.ensure_session_with_data("data.csv")
+    # Create session with directory data
+    success = session_mgr.ensure_session_with_directory("./data")
 
     # Execute code in container
-    result = session_mgr.execute_code("import pandas as pd\\ndf = pd.read_csv('data.csv')")
+    result = session_mgr.execute_code("import pandas as pd\\ndf = pd.read_csv('data/file.csv')")
 
     # Cleanup when done
     session_mgr.cleanup_session()
@@ -232,36 +232,48 @@ class GlobalFargateSessionManager:
 
             return False
 
-    def ensure_session_with_data(self, csv_file_path: str):
+    def ensure_session_with_directory(self, data_directory: str):
         """
-        Create session with CSV data (session creation → S3 upload → container sync)
+        Create session with directory data (recursive upload of all files)
+
+        Workflow:
+        1. Create Fargate session (generates session ID)
+        2. Upload entire directory to S3 (recursive, maintains structure)
+        3. Sync S3 directory to container (recursive)
 
         Args:
-            csv_file_path: Path to CSV file to upload
+            data_directory: Path to local directory to upload (e.g., "./data")
 
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            logger.info(f"🚀 Creating session with data: {csv_file_path}")
+            logger.info(f"🚀 Creating session with directory data: {data_directory}")
 
-            # 1. Create session first (generates timestamp)
+            # Validate directory exists
+            if not os.path.exists(data_directory):
+                raise Exception(f"Directory not found: {data_directory}")
+
+            if not os.path.isdir(data_directory):
+                raise Exception(f"Path is not a directory: {data_directory}")
+
+            # 1. Create session first (generates session ID)
             if not self.ensure_session():
                 raise Exception("Failed to create Fargate session")
 
-            # 2. Upload to S3 using generated session ID
+            # 2. Upload entire directory to S3 (recursive)
             session_id = self._sessions[self._current_request_id]['session_id']
-            s3_key = self._upload_csv_to_s3_with_session_id(csv_file_path, session_id)
-            logger.info(f"📤 CSV uploaded to S3: {s3_key}")
+            s3_prefix = self._upload_directory_to_s3_with_session_id(data_directory, session_id)
+            logger.info(f"📤 Directory uploaded to S3: {s3_prefix}")
 
-            # 3. Sync S3 → container local storage
-            self._sync_csv_from_s3_to_container(s3_key)
-            logger.info("✅ CSV file synced to container")
+            # 3. Sync S3 directory → container local storage (recursive)
+            self._sync_directory_from_s3_to_container(s3_prefix)
+            logger.info("✅ Directory synced to container")
 
             return True
 
         except Exception as e:
-            logger.error(f"❌ Failed to create session with data: {e}")
+            logger.error(f"❌ Failed to create session with directory data: {e}")
             return False
 
     def execute_code(self, code: str, description: str = ""):
@@ -420,10 +432,13 @@ class GlobalFargateSessionManager:
 
     def _create_fargate_container(self):
         """Create and configure Fargate container with HTTP session"""
-        timestamp_id = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        # Append short request ID to prevent collisions in concurrent requests
+        request_id_short = self._current_request_id[:8] if self._current_request_id else "unknown"
+        session_id = f"{timestamp}-{request_id_short}"
 
         fargate_session_info = self._session_manager.create_session(
-            session_id=timestamp_id,
+            session_id=session_id,
             max_executions=300
         )
 
@@ -791,57 +806,94 @@ class GlobalFargateSessionManager:
     # 📤 DATA SYNC METHODS (S3 UPLOAD/DOWNLOAD)
     # ========================================================================
 
-    def _upload_csv_to_s3_with_session_id(self, csv_file_path: str, session_id: str) -> str:
-        """Upload CSV file to S3 using existing session ID (prevents timestamp mismatch)"""
+    def _upload_directory_to_s3_with_session_id(self, data_directory: str, session_id: str) -> str:
+        """
+        Upload entire directory to S3 recursively (maintains subdirectory structure)
+
+        S3 Structure:
+            deep-insight/fargate_sessions/{session_id}/input/
+                ├── file1.csv
+                ├── file2.json
+                ├── subdir1/
+                │   ├── file3.txt
+                │   └── file4.xlsx
+                └── subdir2/
+                    └── file5.csv
+
+        Args:
+            data_directory: Local directory path (e.g., "./data")
+            session_id: Fargate session ID
+
+        Returns:
+            str: S3 prefix (e.g., "deep-insight/fargate_sessions/{session_id}/input/")
+        """
         try:
-            # Use existing session ID (no new timestamp generation)
-            original_filename = os.path.basename(csv_file_path)
-            s3_key = f"deep-insight/fargate_sessions/{session_id}/input/{original_filename}"
+            from pathlib import Path
 
-            # S3 upload
+            s3_prefix = f"deep-insight/fargate_sessions/{session_id}/input/"
             s3_client = boto3.client('s3', region_name=self._get_aws_region())
-            s3_client.upload_file(
-                csv_file_path,
-                S3_BUCKET_NAME,
-                s3_key,
-                ExtraArgs={'ContentType': 'text/csv'}
-            )
 
-            logger.info(f"📤 Uploaded {csv_file_path} → s3://{S3_BUCKET_NAME}/{s3_key}")
-            return s3_key
+            uploaded_count = 0
+            data_path = Path(data_directory).resolve()  # Absolute path
+
+            logger.info(f"📤 Starting directory upload to S3...")
+            logger.info(f"   Local directory: {data_directory}")
+            logger.info(f"   Resolved path: {data_path}")
+            logger.info(f"   S3 prefix: s3://{S3_BUCKET_NAME}/{s3_prefix}")
+
+            # Walk directory tree and upload all files (use absolute path)
+            for root, dirs, files in os.walk(data_path):
+                for filename in files:
+                    local_file_path = Path(root) / filename
+
+                    # Calculate relative path from base directory
+                    relative_path = local_file_path.relative_to(data_path)
+                    s3_key = f"{s3_prefix}{relative_path}".replace('\\', '/')
+
+                    # Upload file to S3
+                    s3_client.upload_file(
+                        str(local_file_path),
+                        S3_BUCKET_NAME,
+                        s3_key
+                    )
+
+                    uploaded_count += 1
+                    logger.info(f"   📤 {relative_path} → s3://{S3_BUCKET_NAME}/{s3_key}")
+
+            logger.info(f"✅ Uploaded {uploaded_count} files to S3")
+            return s3_prefix
 
         except Exception as e:
-            logger.error(f"❌ S3 upload failed: {e}")
+            logger.error(f"❌ Directory upload to S3 failed: {e}")
             raise
 
-    def _sync_csv_from_s3_to_container(self, s3_key: str):
-        """Synchronize CSV file from S3 to container (Enhanced Logging)"""
+    def _sync_directory_from_s3_to_container(self, s3_prefix: str):
+        """
+        Synchronize entire directory from S3 to container (recursive)
+
+        Args:
+            s3_prefix: S3 prefix (e.g., "deep-insight/fargate_sessions/{session_id}/input/")
+        """
         try:
-            # ALB DNS (get from session manager)
             alb_dns = self._session_manager.alb_dns
-            filename = s3_key.split('/')[-1]
 
-            # ✅ 1. Start log
-            logger.info(f"🔄 Starting file sync...")
-            logger.info(f"   S3 Key: {s3_key}")
-            logger.info(f"   Filename: {filename}")
-            logger.info(f"   Target: /app/data/{filename}")
+            logger.info(f"🔄 Starting directory sync from S3 to container...")
+            logger.info(f"   S3 Prefix: {s3_prefix}")
+            logger.info(f"   Target: /app/data/ (recursive)")
 
-            # File sync request
-            # s3_key format: "deep-insight/fargate_sessions/{session_id}/input/file.csv"
+            # Directory sync request (container handles recursive download)
             sync_request = {
                 "action": "sync_data_from_s3",
                 "bucket_name": S3_BUCKET_NAME,
-                "s3_key_prefix": f"deep-insight/fargate_sessions/{s3_key.split('/')[2]}/input/",
+                "s3_key_prefix": s3_prefix,
                 "local_path": "/app/data/"
             }
 
-            # ✅ 2. Request log
-            logger.info(f"📤 Sending file sync request:")
-            logger.info(f"   URL: {alb_dns}/file-sync")
+            logger.info(f"📤 Sending directory sync request:")
+            logger.info(f"   URL: http://{alb_dns}/file-sync")
             logger.info(f"   Request: {sync_request}")
 
-            # ✅ Use per-request HTTP client (cookie isolation)
+            # Use per-request HTTP client (cookie isolation)
             http_client = self._get_http_client(self._current_request_id)
             response = http_client.post(
                 f"http://{alb_dns}/file-sync",
@@ -849,33 +901,33 @@ class GlobalFargateSessionManager:
                 timeout=self.FILE_SYNC_TIMEOUT
             )
 
-            # ✅ 3. Response log
-            logger.info(f"📥 File sync response:")
+            logger.info(f"📥 Directory sync response:")
             logger.info(f"   Status: {response.status_code}")
-            logger.info(f"   Body: {response.text[:500]}")  # First 500 chars only
+            logger.info(f"   Body: {response.text[:500]}")
 
             if response.status_code != 200:
-                logger.error(f"❌ File sync failed with status {response.status_code}")
-                raise Exception(f"File sync failed: {response.text}")
+                logger.error(f"❌ Directory sync failed with status {response.status_code}")
+                raise Exception(f"Directory sync failed: {response.text}")
 
             result = response.json()
             files_count = result.get('files_count', 0)
             downloaded_files = result.get('downloaded_files', [])
 
-            # ✅ 4. Result log
-            logger.info(f"✅ File sync completed:")
+            logger.info(f"✅ Directory sync completed:")
             logger.info(f"   Files synced: {files_count}")
-            logger.info(f"   Downloaded: {downloaded_files}")
+            if files_count <= 10:
+                logger.info(f"   Downloaded: {downloaded_files}")
+            else:
+                logger.info(f"   Downloaded (first 10): {downloaded_files[:10]}")
+                logger.info(f"   ... and {files_count - 10} more files")
 
-            # ✅ 5. Wait start log
-            logger.info(f"⏳ Waiting {self.FILE_SYNC_WAIT} seconds for file sync to complete...")
+            logger.info(f"⏳ Waiting {self.FILE_SYNC_WAIT} seconds for directory sync to complete...")
             time.sleep(self.FILE_SYNC_WAIT)
 
-            # ✅ 6. Wait complete log
-            logger.info("✅ File sync wait complete")
+            logger.info("✅ Directory sync wait complete")
 
         except Exception as e:
-            logger.error(f"❌ File sync failed: {e}")
+            logger.error(f"❌ Directory sync failed: {e}")
             logger.error(f"   Exception type: {type(e).__name__}")
             logger.error(f"   Exception details: {str(e)[:1000]}")
             raise

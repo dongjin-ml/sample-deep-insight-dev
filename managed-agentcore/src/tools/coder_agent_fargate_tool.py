@@ -86,18 +86,22 @@ def handle_coder_agent_fargate_tool(task: Annotated[str, "The coding task or que
 
         request_prompt, full_plan = shared_state.get("request_prompt", ""), shared_state.get("full_plan", "")
         clues, messages = shared_state.get("clues", ""), shared_state.get("messages", [])
-        csv_file_path = shared_state.get("csv_file_path")  # 동적 CSV 파일 경로
 
-        # Fargate 세션 생성 (CSV 파일과 함께 또는 일반 세션)
+        # Check for data directory
+        data_directory = shared_state.get("data_directory")
+
+        # Fargate session creation with data
         from src.tools.global_fargate_coordinator import get_global_session
         fargate_manager = get_global_session()
 
-        if csv_file_path and os.path.exists(csv_file_path):
-            logger.info(f"{Colors.BLUE}📂 Creating Fargate session with CSV data: {csv_file_path}{Colors.END}")
-            if not fargate_manager.ensure_session_with_data(csv_file_path):
-                return "Error: Failed to create Fargate session with CSV data"
+        if data_directory:
+            # Directory upload (recursive)
+            logger.info(f"{Colors.BLUE}📂 Creating Fargate session with directory data: {data_directory}{Colors.END}")
+            if not fargate_manager.ensure_session_with_directory(data_directory):
+                return "Error: Failed to create Fargate session with directory data"
         else:
-            logger.info(f"{Colors.BLUE}📦 Creating standard Fargate session{Colors.END}")
+            # No data to upload
+            logger.info(f"{Colors.BLUE}📦 Creating standard Fargate session (no data){Colors.END}")
             if not fargate_manager.ensure_session():
                 return "Error: Failed to create Fargate session"
 
