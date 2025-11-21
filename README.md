@@ -81,7 +81,7 @@ Deep Insight offers two deployment models designed for different operational nee
 | Feature | Self-Hosted | Managed AgentCore |
 |---------|-------------|-------------------|
 | **Agent Customization** | ✅ Full code access | ✅ Full code access |
-| **Infrastructure Management** | Self-managed (local/VPC) | AWS-managed (ECS Fargate) |
+| **Infrastructure Management** | Self-managed (local/VPC) | AWS-managed (Amazon Bedrock AgentCore) |
 | **Setup Time** | ~10 minutes | ~65-105 minutes (one-time) |
 | **Development Iteration** | Instant (no rebuild) | Requires Docker rebuild |
 | **Operational Overhead** | Medium (manual scaling) | Low (auto-scaling) |
