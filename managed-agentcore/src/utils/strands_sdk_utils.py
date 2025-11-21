@@ -524,14 +524,14 @@ class strands_utils():
                 print(f"\n[TOOL RESULT - {tool_name}]", flush=True)
 
                 # Parse output based on function name
-                if tool_name in ["python_repl_tool", "fargate_python_tool"] and len(output.split("||")) == 3:
+                if tool_name in ["python_repl_tool", "custom_interpreter_python_tool"] and len(output.split("||")) == 3:
                     status, code, stdout = output.split("||")
                     callback_tool.on_llm_new_token(f"Status: {status}\n")
 
                     if code: callback_tool.on_llm_new_token(f"Code:\n```python\n{code}\n```\n")
                     if stdout and stdout != 'None': callback_tool.on_llm_new_token(f"Output:\n{stdout}\n")
 
-                elif tool_name in ["bash_tool", "fargate_bash_tool"] and len(output.split("||")) == 2:
+                elif tool_name in ["bash_tool", "custom_interpreter_bash_tool"] and len(output.split("||")) == 2:
                     cmd, stdout = output.split("||")
                     if cmd: callback_tool.on_llm_new_token(f"CMD:\n```bash\n{cmd}\n```\n")
                     if stdout and stdout != 'None': callback_tool.on_llm_new_token(f"Output:\n{stdout}\n")

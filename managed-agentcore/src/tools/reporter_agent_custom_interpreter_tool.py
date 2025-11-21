@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from src.utils.strands_sdk_utils import strands_utils
 from src.prompts.template import apply_prompt_template
 from src.utils.common_utils import get_message_from_string
-from src.tools import fargate_python_tool, fargate_bash_tool
+from src.tools import custom_interpreter_python_tool, custom_interpreter_bash_tool
 from src.utils.strands_sdk_utils import TokenTracker
 
 # Observability
@@ -24,15 +24,15 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 TOOL_SPEC = {
-    "name": "coder_agent_fargate_tool",
-    "description": "Execute Python code and bash commands using a specialized coder agent running on AWS Fargate. This tool provides access to a coder agent that can execute Python code for data analysis and calculations, run bash commands for system operations, and handle complex programming tasks in isolated Fargate containers.",
+    "name": "reporter_agent_custom_interpreter_tool",
+    "description": "Generate comprehensive reports based on analysis results using a specialized reporter agent with custom code interpreter. This tool provides access to a reporter agent that can read analysis results from artifacts, create structured reports with visualizations, and generate output in multiple formats (HTML, PDF, Markdown) in isolated containers.",
     "inputSchema": {
         "json": {
             "type": "object",
             "properties": {
                 "task": {
                     "type": "string",
-                    "description": "The coding task or question that needs to be executed by the coder agent."
+                    "description": "The reporting task or instruction for generating the report (e.g., 'Create a comprehensive analysis report', 'Generate PDF report with all findings')."
                 }
             },
             "required": ["task"]
@@ -51,29 +51,31 @@ class Colors:
     BLUE = '\033[94m'
     END = '\033[0m'
 
-def handle_coder_agent_fargate_tool(task: Annotated[str, "The coding task or question that needs to be executed by the coder agent."]):
+def handle_reporter_agent_custom_interpreter_tool(task: Annotated[str, "The reporting task or instruction for generating the report."]):
     """
-    Execute Python code and bash commands using a specialized coder agent running on AWS Fargate.
+    Generate comprehensive reports based on analysis results using a specialized reporter agent with custom code interpreter.
 
-    This tool provides access to a coder agent that can:
-    - Execute Python code for data analysis and calculations in Fargate containers
-    - Run bash commands for system operations in isolated environments
-    - Handle complex programming tasks with automatic container lifecycle management
+    This tool provides access to a reporter agent that can:
+    - Read analysis results from artifacts directory in isolated containers
+    - Create structured reports with executive summaries, key findings, and detailed analysis
+    - Generate reports in multiple formats (HTML, PDF, Markdown) with automatic S3 upload
+    - Include visualizations and charts in reports using isolated environments
+    - Process accumulated analysis results from all_results.txt
 
     Args:
-        task: The coding task or question that needs to be executed
+        task: The reporting task or instruction for generating the report
 
     Returns:
-        The result of the code execution or analysis
+        The generated report content and confirmation of file creation
     """
     tracer = trace.get_tracer(
         instrumenting_module_name=os.getenv("TRACER_MODULE_NAME", "insight_extractor_agent"),
         instrumenting_library_version=os.getenv("TRACER_LIBRARY_VERSION", "1.0.0")
     )
-    with tracer.start_as_current_span("coder_agent_fargate_tool") as span:
+    with tracer.start_as_current_span("reporter_agent_custom_interpreter_tool") as span:
         print()  # Add newline before log
-        logger.info(f"\n{Colors.GREEN}Coder Agent Fargate Tool starting task{Colors.END}")
-        logger.info(f"{Colors.BLUE}🚀 Using AWS Fargate for isolated code execution{Colors.END}")
+        logger.info(f"\n{Colors.GREEN}Reporter Agent Custom Interpreter Tool starting task{Colors.END}")
+        logger.info(f"{Colors.BLUE}🚀 Using custom code interpreter for isolated report generation{Colors.END}")
 
         # Try to extract shared state from global storage
         from src.graph.nodes import _global_node_states
@@ -87,41 +89,23 @@ def handle_coder_agent_fargate_tool(task: Annotated[str, "The coding task or que
         request_prompt, full_plan = shared_state.get("request_prompt", ""), shared_state.get("full_plan", "")
         clues, messages = shared_state.get("clues", ""), shared_state.get("messages", [])
 
-        # Check for data directory
-        data_directory = shared_state.get("data_directory")
-
-        # Fargate session creation with data
-        from src.tools.global_fargate_coordinator import get_global_session
-        fargate_manager = get_global_session()
-
-        if data_directory:
-            # Directory upload (recursive)
-            logger.info(f"{Colors.BLUE}📂 Creating Fargate session with directory data: {data_directory}{Colors.END}")
-            if not fargate_manager.ensure_session_with_directory(data_directory):
-                return "Error: Failed to create Fargate session with directory data"
-        else:
-            # No data to upload
-            logger.info(f"{Colors.BLUE}📦 Creating standard Fargate session (no data){Colors.END}")
-            if not fargate_manager.ensure_session():
-                return "Error: Failed to create Fargate session"
-
-        # Create coder agent with Fargate-enabled tools using consistent pattern
-        logger.info(f"{Colors.BLUE}📦 Creating coder agent with Fargate tools{Colors.END}")
-        coder_agent = strands_utils.get_agent(
-            agent_name="coder-fargate",
+        # Create reporter agent with custom interpreter tools using consistent pattern
+        logger.info(f"{Colors.BLUE}📦 Creating reporter agent with custom interpreter tools{Colors.END}")
+        reporter_agent = strands_utils.get_agent(
+            agent_name="reporter",  # 기존 이름 유지
             system_prompts=apply_prompt_template(
-                prompt_name="coder",
+                prompt_name="reporter",
                 prompt_context={
                     "USER_REQUEST": request_prompt,
                     "FULL_PLAN": full_plan,
-                    "EXECUTION_ENVIRONMENT": "AWS Fargate (isolated containers with automatic lifecycle management)"
+                    "EXECUTION_ENVIRONMENT": "Custom code interpreter (isolated containers with automatic S3 upload for PDFs and charts)"
                 }
             ),
-            model_id=os.getenv("CODER_MODEL_ID", os.getenv("DEFAULT_MODEL_ID")),
+            model_id=os.getenv("REPORTER_MODEL_ID", os.getenv("DEFAULT_MODEL_ID")),
             enable_reasoning=False,
-            prompt_cache_info=(True, "default"),  # reasoning agent uses prompt caching
+            prompt_cache_info=(True, "default"),  # enable prompt caching for reporter agent
             tool_cache=True,
-            tools=[fargate_python_tool, fargate_bash_tool],  # Fargate-enabled tools
+            tools=[custom_interpreter_python_tool, custom_interpreter_bash_tool],  # Custom interpreter tools
             streaming=True  # Enable streaming for consistency
         )
 
@@ -133,11 +117,11 @@ def handle_coder_agent_fargate_tool(task: Annotated[str, "The coding task or que
         message_with_cache = [ContentBlock(text=message), ContentBlock(cachePoint={"type": "default"})]  # Cache point for messages caching
 
         # Process streaming response and collect text in one pass
-        async def process_coder_stream():
+        async def process_reporter_stream():
             full_text = ""
-            logger.info(f"{Colors.BLUE}🔄 Processing coder agent with Fargate backend{Colors.END}")
+            logger.info(f"{Colors.BLUE}🔄 Processing reporter agent with custom interpreter backend{Colors.END}")
             async for event in strands_utils.process_streaming_response_yield(
-                coder_agent, message_with_cache, agent_name="coder-fargate", source="coder_fargate_tool"
+                reporter_agent, message_with_cache, agent_name="reporter", source="reporter_custom_interpreter_tool"
             ):
                 if event.get("event_type") == "text_chunk":
                     full_text += event.get("data", "")
@@ -145,47 +129,47 @@ def handle_coder_agent_fargate_tool(task: Annotated[str, "The coding task or que
                 TokenTracker.accumulate(event, shared_state)
             return {"text": full_text}
 
-        response = asyncio.run(process_coder_stream())
+        response = asyncio.run(process_reporter_stream())
         result_text = response['text']
 
         # Update clues
-        clues = '\n\n'.join([clues, CLUES_FORMAT.format("coder-fargate", response["text"])])
+        clues = '\n\n'.join([clues, CLUES_FORMAT.format("reporter", response["text"])])
 
         # Update history
         history = shared_state.get("history", [])
-        history.append({"agent":"coder-fargate", "message": response["text"]})
+        history.append({"agent":"reporter", "message": response["text"]})
 
         # Update shared state
         shared_state['messages'] = [get_message_from_string(
             role="user",
-            string=RESPONSE_FORMAT.format("coder-fargate", response["text"]),
+            string=RESPONSE_FORMAT.format("reporter", response["text"]),
             imgs=[]
         )]
         shared_state['clues'] = clues
         shared_state['history'] = history
 
-        logger.info(f"\n{Colors.GREEN}Coder Agent Fargate Tool completed successfully{Colors.END}")
-        logger.info(f"{Colors.BLUE}✅ Code executed in isolated Fargate environment{Colors.END}")
+        logger.info(f"\n{Colors.GREEN}Reporter Agent Custom Interpreter Tool completed successfully{Colors.END}")
+        logger.info(f"{Colors.BLUE}✅ Reports generated in isolated custom interpreter environment{Colors.END}")
         # Print token usage using TokenTracker
         TokenTracker.print_current(shared_state)
 
         # Add Event
         add_span_event(span, "input_message", {"message": str(message)})
         add_span_event(span, "response", {"response": str(response["text"])})
-        add_span_event(span, "execution_environment", {"environment": "AWS Fargate"})
+        add_span_event(span, "execution_environment", {"environment": "Custom code interpreter"})
 
         return result_text
 
 # Function name must match tool name
-def coder_agent_fargate_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
+def reporter_agent_custom_interpreter_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     task = tool["input"]["task"]
 
-    # Use the existing handle_coder_agent_fargate_tool function
-    result = handle_coder_agent_fargate_tool(task)
+    # Use the existing handle_reporter_agent_custom_interpreter_tool function
+    result = handle_reporter_agent_custom_interpreter_tool(task)
 
     # Check if execution was successful based on the result string
-    if "Error in coder agent tool" in result or "Error: No shared state available" in result:
+    if "Error in reporter agent tool" in result or "Error: No shared state available" in result:
         return {
             "toolUseId": tool_use_id,
             "status": "error",
@@ -198,5 +182,3 @@ def coder_agent_fargate_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
             "content": [{"text": result}]
         }
 
-# Alias for backward compatibility
-handle_coder_agent_tool_fargate = handle_coder_agent_fargate_tool

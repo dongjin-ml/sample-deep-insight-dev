@@ -11,7 +11,7 @@ from src.utils.common_utils import get_message_from_string
 import pandas as pd
 from src.utils.strands_sdk_utils import TokenTracker
 
-from src.tools import fargate_python_tool, fargate_bash_tool
+from src.tools import custom_interpreter_python_tool, custom_interpreter_bash_tool
 
 # Observability
 from opentelemetry import trace
@@ -147,7 +147,7 @@ def handle_validator_agent_fargate_tool(task: Annotated[str, "The validation tas
             enable_reasoning=False,
             prompt_cache_info=(False, None),  # reasoning agent uses prompt caching
             tool_cache=False,
-            tools=[fargate_python_tool, fargate_bash_tool],
+            tools=[custom_interpreter_python_tool, custom_interpreter_bash_tool],
             streaming=True  # Enable streaming for consistency
         )
 

@@ -232,6 +232,15 @@ class SessionManager:
             )
             print(f"  📁 Uploaded {artifacts_uploaded} files from artifacts/", flush=True)
 
+        # Upload data folder (CSV and input data files)
+        data_path = "/app/data"
+        if os.path.exists(data_path):
+            data_uploaded = self._upload_directory_to_s3(
+                s3_client, bucket, data_path,
+                f"deep-insight/fargate_sessions/{self.session_id}/data"
+            )
+            print(f"  📁 Uploaded {data_uploaded} files from data/", flush=True)
+
         print(f"✅ S3 upload completed for session {self.session_id}", flush=True)
 
     def _upload_directory_to_s3(self, s3_client, bucket, local_dir, s3_prefix):

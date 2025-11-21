@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 TOOL_SPEC = {
-    "name": "fargate_python_tool",
-    "description": "Use this to execute python code and do data analysis or calculation using AWS Fargate. If you want to see the output of a value, you should print it out with `print(...)`. This is visible to the user.",
+    "name": "custom_interpreter_python_tool",
+    "description": "Use this to execute python code and do data analysis or calculation using custom code interpreter. If you want to see the output of a value, you should print it out with `print(...)`. This is visible to the user.",
     "inputSchema": {
         "json": {
             "type": "object",
@@ -42,18 +42,18 @@ class Colors:
     END = '\033[0m'
 
 @log_io
-def handle_fargate_python_tool(code: Annotated[str, "The python code to execute to do further analysis or calculation."]):
+def handle_custom_interpreter_python_tool(code: Annotated[str, "The python code to execute to do further analysis or calculation."]):
     """
-    Use this to execute python code and do data analysis or calculation using AWS Fargate.
+    Use this to execute python code and do data analysis or calculation using custom code interpreter.
     If you want to see the output of a value, you should print it out with `print(...)`. This is visible to the user.
     """
     tracer = trace.get_tracer(
         instrumenting_module_name=os.getenv("TRACER_MODULE_NAME", "insight_extractor_agent"),
         instrumenting_library_version=os.getenv("TRACER_LIBRARY_VERSION", "1.0.0")
     )
-    with tracer.start_as_current_span("fargate_python_tool") as span:
+    with tracer.start_as_current_span("custom_interpreter_python_tool") as span:
         print()  # Add newline before log
-        logger.info(f"{Colors.GREEN}===== Executing Python code in Fargate ====={Colors.END}")
+        logger.info(f"{Colors.GREEN}===== Executing Python code in custom interpreter ====={Colors.END}")
 
         try:
             # 글로벌 세션 매니저를 통해 Fargate에서 실행
@@ -156,7 +156,7 @@ def handle_fargate_python_tool(code: Annotated[str, "The python code to execute 
             # 기존 인터페이스와 동일한 형식으로 반환
             result_str = f"Successfully executed:\n||{code_summary}||{stdout}"
 
-            logger.info(f"{Colors.GREEN}===== Code execution successful in Fargate ====={Colors.END}")
+            logger.info(f"{Colors.GREEN}===== Code execution successful in custom interpreter ====={Colors.END}")
 
             # Add Event
             add_span_event(span, "code", {"code": str(code_summary)})
@@ -175,12 +175,12 @@ def handle_fargate_python_tool(code: Annotated[str, "The python code to execute 
             return error_msg
 
 # Function name must match tool name
-def fargate_python_tool(tool: ToolUse, **kwargs: Any) -> ToolResult:
+def custom_interpreter_python_tool(tool: ToolUse, **kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     code = tool["input"]["code"]
 
-    # Use the existing handle_fargate_python_tool function
-    result = handle_fargate_python_tool(code)
+    # Use the existing handle_custom_interpreter_python_tool function
+    result = handle_custom_interpreter_python_tool(code)
 
     # Check if execution was successful based on the result string
     if "Failed to execute" in result:
@@ -196,5 +196,3 @@ def fargate_python_tool(tool: ToolUse, **kwargs: Any) -> ToolResult:
             "content": [{"text": result}]
         }
 
-# Alias for backward compatibility
-fargate_python_repl_tool = fargate_python_tool

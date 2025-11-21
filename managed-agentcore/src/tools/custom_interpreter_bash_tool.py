@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 TOOL_SPEC = {
-    "name": "fargate_bash_tool",
-    "description": "Use this to execute bash command and do necessary operations using AWS Fargate.",
+    "name": "custom_interpreter_bash_tool",
+    "description": "Use this to execute bash command and do necessary operations using custom code interpreter.",
     "inputSchema": {
         "json": {
             "type": "object",
@@ -39,16 +39,16 @@ class Colors:
     END = '\033[0m'
 
 @log_io
-def handle_fargate_bash_tool(cmd: Annotated[str, "The bash command to be executed."]):
-    """Use this to execute bash command and do necessary operations using AWS Fargate."""
+def handle_custom_interpreter_bash_tool(cmd: Annotated[str, "The bash command to be executed."]):
+    """Use this to execute bash command and do necessary operations using custom code interpreter."""
 
     tracer = trace.get_tracer(
         instrumenting_module_name=os.getenv("TRACER_MODULE_NAME", "insight_extractor_agent"),
         instrumenting_library_version=os.getenv("TRACER_LIBRARY_VERSION", "1.0.0")
     )
-    with tracer.start_as_current_span("fargate_bash_tool") as span:
+    with tracer.start_as_current_span("custom_interpreter_bash_tool") as span:
         print()  # Add newline before log
-        logger.info(f"\n{Colors.GREEN}Executing Bash in Fargate: {cmd}{Colors.END}")
+        logger.info(f"\n{Colors.GREEN}Executing Bash in custom interpreter: {cmd}{Colors.END}")
 
         try:
             # 글로벌 세션 매니저를 통해 Fargate에서 실행
@@ -77,9 +77,9 @@ def handle_fargate_bash_tool(cmd: Annotated[str, "The bash command to be execute
             # 기존 인터페이스와 동일한 형식으로 반환
             results = "||".join([cmd, stdout])
 
-            logger.info(f"{Colors.GREEN}===== Bash command execution successful in Fargate ====={Colors.END}")
-            logger.info(f"{Colors.GREEN}===== Command in Fargate ====={Colors.END}{str(cmd)}")
-            logger.info(f"{Colors.YELLOW}===== Result in Fargate ====={Colors.END}{str(stdout)}")
+            logger.info(f"{Colors.GREEN}===== Bash command execution successful in custom interpreter ====={Colors.END}")
+            logger.info(f"{Colors.GREEN}===== Command in custom interpreter ====={Colors.END}{str(cmd)}")
+            logger.info(f"{Colors.YELLOW}===== Result in custom interpreter ====={Colors.END}{str(stdout)}")
 
             # Add Event
             add_span_event(span, "command", {"cmd": str(cmd)})
@@ -99,12 +99,12 @@ def handle_fargate_bash_tool(cmd: Annotated[str, "The bash command to be execute
             return error_message
 
 # Function name must match tool name
-def fargate_bash_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
+def custom_interpreter_bash_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     cmd = tool["input"]["cmd"]
 
-    # Use the existing handle_fargate_bash_tool function
-    result = handle_fargate_bash_tool(cmd)
+    # Use the existing handle_custom_interpreter_bash_tool function
+    result = handle_custom_interpreter_bash_tool(cmd)
 
     # Check if execution was successful based on the result string
     if "Command failed" in result or "Error executing command" in result:
@@ -121,5 +121,5 @@ def fargate_bash_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
         }
 
 if __name__ == "__main__":
-    # Test example using the handle_fargate_bash_tool function directly
-    print(handle_fargate_bash_tool("ls -la"))
+    # Test example using the handle_custom_interpreter_bash_tool function directly
+    print(handle_custom_interpreter_bash_tool("ls -la"))
