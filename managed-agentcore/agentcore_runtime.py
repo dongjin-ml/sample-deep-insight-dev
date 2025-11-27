@@ -646,16 +646,16 @@ async def agentcore_streaming_execution(
             print(f"🚀 Launching AgentCore Runtime with query: {user_query[:100]}...")
 
             # Step 5: Stream events from graph execution
-            # Filter out high-volume events to prevent client connection overload
-            # See: https://github.com/aws/... - socket.send() errors from event volume
-            SKIP_EVENT_TYPES = {"agent_usage_stream"}  # usage_metadata events are very frequent
+            STREAM_EVENT_TYPES = {"agent_usage_stream", "agent_reasoning_stream", "agent_text_stream", "workflow_complete"}
             event_count = 0
+            streamed_count = 0
             async for event in graph.stream_async(graph_input):
-                # Skip high-frequency metadata events to reduce streaming volume
-                if event.get("type") in SKIP_EVENT_TYPES:
-                    continue
                 event_count += 1
-                yield _enrich_event(event, event_count)
+                # Stream small/medium events as keepalives
+                if event.get("type") in STREAM_EVENT_TYPES:
+                    streamed_count += 1
+                    yield _enrich_event(event, streamed_count)
+            print(f"📊 Total events: {event_count}, Streamed: {streamed_count}")
 
             # Step 6: Print conversation history and completion
             _print_conversation_history()
