@@ -73,12 +73,20 @@ write_and_execute_tool(
     file_path="./artifacts/code/coder_analysis_utils.py",
     content='''
 import json, os
+import numpy as np
 from datetime import datetime
 
 _calculations = []
 
+def to_python_type(value):
+    """Convert numpy/pandas types to Python native types for JSON serialization"""
+    if isinstance(value, (np.integer, np.int64)): return int(value)
+    elif isinstance(value, (np.floating, np.float64)): return float(value)
+    elif isinstance(value, np.ndarray): return value.tolist()
+    return value
+
 def track_calculation(calc_id, value, description, formula, source_file="", source_columns=None, importance="medium"):
-    _calculations.append({{"id": calc_id, "value": value, "description": description,
+    _calculations.append({{"id": calc_id, "value": to_python_type(value), "description": description,
         "formula": formula, "source_file": source_file,
         "source_columns": source_columns or [], "importance": importance}})
 
@@ -143,7 +151,7 @@ write_and_execute_tool(
 ```
 
 **SECONDARY TOOLS:**
-- `bash_tool`: ls, head, file operations only
+- `bash_tool`: ls, head, file operations, `pip install` (install missing packages as needed)
 - `file_read`: Read existing files
 
 **File Structure:**
@@ -243,6 +251,13 @@ Do NOT:
 
 **Common Errors to Avoid:**
 ```python
+# ❌ WRONG - JSON serialization error with numpy types
+total = df['Amount'].sum()  # Returns np.int64
+json.dump({{"total": total}})  # TypeError: Object of type int64 is not JSON serializable
+
+# ✅ CORRECT - Use to_python_type() in track_calculation (auto-converts)
+track_calculation("calc_001", total, ...)  # to_python_type() handles conversion
+
 # ❌ WRONG
 ax.text(x, y, label, va=va)  # NameError: va not defined
 ax.text(x, y, label, xytext=(0,5))  # xytext only works with annotate()

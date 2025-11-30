@@ -11,7 +11,7 @@ from src.utils.common_utils import get_message_from_string
 load_dotenv()
 
 # Tools
-from src.tools import coder_agent_custom_interpreter_tool, reporter_agent_custom_interpreter_tool, tracker_agent_tool, validator_agent_fargate_tool
+from src.tools import coder_agent_custom_interpreter_tool, reporter_agent_custom_interpreter_tool, tracker_agent_tool, validator_agent_custom_interpreter_tool
 
 # Observability
 from opentelemetry import trace
@@ -232,7 +232,7 @@ async def supervisor_node(task=None, **kwargs):
             enable_reasoning=False,
             prompt_cache_info=(True, "default"),  # enable prompt caching for reasoning agent
             tool_cache=True,
-            tools=[coder_agent_custom_interpreter_tool, reporter_agent_custom_interpreter_tool, tracker_agent_tool, validator_agent_fargate_tool],  # Add coder, reporter, tracker and validator agents as tools
+            tools=[coder_agent_custom_interpreter_tool, reporter_agent_custom_interpreter_tool, tracker_agent_tool, validator_agent_custom_interpreter_tool],  # Add coder, reporter, tracker and validator agents as tools
             streaming=True,
         )
 

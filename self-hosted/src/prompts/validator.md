@@ -114,7 +114,7 @@ write_and_execute_tool(
 ```
 
 **SECONDARY TOOLS:**
-- `bash_tool`: ls, head, file operations only
+- `bash_tool`: ls, head, file operations, `pip install` (install missing packages as needed)
 - `file_read`: Read existing files
 
 **File Structure:**

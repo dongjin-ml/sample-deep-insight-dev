@@ -139,7 +139,7 @@ def reporter_agent_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
     result = handle_reporter_agent_tool(task)
     
     # Check if execution was successful based on the result string
-    if "Error in reporter agent tool" in result:
+    if "Error in reporter agent tool" in result or "Error: " in result:
         return {
             "toolUseId": tool_use_id,
             "status": "error",

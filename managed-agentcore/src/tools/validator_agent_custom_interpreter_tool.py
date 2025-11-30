@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import logging
 import os
 import asyncio
@@ -8,10 +10,8 @@ from dotenv import load_dotenv
 from src.utils.strands_sdk_utils import strands_utils
 from src.prompts.template import apply_prompt_template
 from src.utils.common_utils import get_message_from_string
-import pandas as pd
+from src.tools import custom_interpreter_write_and_execute_tool, custom_interpreter_bash_tool
 from src.utils.strands_sdk_utils import TokenTracker
-
-from src.tools import custom_interpreter_python_tool, custom_interpreter_bash_tool
 
 # Observability
 from opentelemetry import trace
@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 TOOL_SPEC = {
-    "name": "validator_agent_fargate_tool",
-    "description": "Validate numerical calculations and generate citation metadata for reports using AWS Fargate containers. This tool validates calculations performed by the Coder agent, re-verifies important calculations using original data sources, and creates citation metadata for numerical accuracy and transparency.",
+    "name": "validator_agent_custom_interpreter_tool",
+    "description": "Validate numerical calculations and generate citation metadata for reports using custom code interpreter. This tool validates calculations performed by the Coder agent, re-verifies important calculations using original data sources, and creates citation metadata for numerical accuracy and transparency.",
     "inputSchema": {
         "json": {
             "type": "object",
@@ -93,7 +93,7 @@ class FargateValidator:
 
         return priority_calcs, stats
 
-def handle_validator_agent_fargate_tool(task: Annotated[str, "The validation task or instruction for validating calculations and generating citations."]):
+def handle_validator_agent_custom_interpreter_tool(task: Annotated[str, "The validation task or instruction for validating calculations and generating citations."]):
     """
     Validate numerical calculations and generate citation metadata for reports using AWS Fargate containers.
 
@@ -115,9 +115,9 @@ def handle_validator_agent_fargate_tool(task: Annotated[str, "The validation tas
         instrumenting_module_name=os.getenv("TRACER_MODULE_NAME", "insight_extractor_agent"),
         instrumenting_library_version=os.getenv("TRACER_LIBRARY_VERSION", "1.0.0")
     )
-    with tracer.start_as_current_span("validator_agent_fargate_tool") as span:
+    with tracer.start_as_current_span("validator_agent_custom_interpreter_tool") as span:
         print()  # Add newline before log
-        logger.info(f"\n{Colors.GREEN}Validator Agent Fargate Tool starting{Colors.END}")
+        logger.info(f"\n{Colors.GREEN}Validator Agent Custom Interpreter Tool starting{Colors.END}")
 
         # Try to extract shared state from global storage
         from src.graph.nodes import _global_node_states
@@ -131,8 +131,26 @@ def handle_validator_agent_fargate_tool(task: Annotated[str, "The validation tas
         request_prompt, full_plan = shared_state.get("request_prompt", ""), shared_state.get("full_plan", "")
         clues, messages = shared_state.get("clues", ""), shared_state.get("messages", [])
 
-        # Create validator agent with Fargate-enabled tools using consistent pattern
-        logger.info(f"{Colors.BLUE}📦 Creating validator agent with Fargate tools{Colors.END}")
+        # Check for data directory
+        data_directory = shared_state.get("data_directory")
+
+        # Fargate session creation with data
+        from src.tools.global_fargate_coordinator import get_global_session
+        fargate_manager = get_global_session()
+
+        if data_directory:
+            # Directory upload (recursive)
+            logger.info(f"{Colors.GREEN}📂 Creating custom interpreter session with directory data: {data_directory}{Colors.END}")
+            if not fargate_manager.ensure_session_with_directory(data_directory):
+                return "Error: Failed to create custom interpreter session with directory data"
+        else:
+            # No data to upload
+            logger.info(f"{Colors.GREEN}📦 Creating standard custom interpreter session (no data){Colors.END}")
+            if not fargate_manager.ensure_session():
+                return "Error: Failed to create custom interpreter session"
+
+        # Create validator agent with custom interpreter tools using consistent pattern
+        logger.info(f"{Colors.BLUE}📦 Creating validator agent with custom interpreter tools{Colors.END}")
         validator_agent = strands_utils.get_agent(
             agent_name="validator",
             system_prompts=apply_prompt_template(
@@ -147,7 +165,7 @@ def handle_validator_agent_fargate_tool(task: Annotated[str, "The validation tas
             enable_reasoning=False,
             prompt_cache_info=(False, None),  # reasoning agent uses prompt caching
             tool_cache=False,
-            tools=[custom_interpreter_python_tool, custom_interpreter_bash_tool],
+            tools=[custom_interpreter_write_and_execute_tool, custom_interpreter_bash_tool],
             streaming=True  # Enable streaming for consistency
         )
 
@@ -185,7 +203,7 @@ def handle_validator_agent_fargate_tool(task: Annotated[str, "The validation tas
         shared_state['clues'] = clues
         shared_state['history'] = history
 
-        logger.info(f"\n{Colors.GREEN}Validator Agent Fargate Tool completed successfully{Colors.END}")
+        logger.info(f"\n{Colors.GREEN}Validator Agent Custom Interpreter Tool completed successfully{Colors.END}")
         # Print token usage using TokenTracker
         TokenTracker.print_current(shared_state)
 
@@ -196,15 +214,15 @@ def handle_validator_agent_fargate_tool(task: Annotated[str, "The validation tas
         return result_text
 
 # Function name must match tool name
-def validator_agent_fargate_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
+def validator_agent_custom_interpreter_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     task = tool["input"]["task"]
 
-    # Use the existing handle_validator_agent_fargate_tool function
-    result = handle_validator_agent_fargate_tool(task)
+    # Use the existing handle function
+    result = handle_validator_agent_custom_interpreter_tool(task)
 
     # Check if execution was successful based on the result string
-    if "Error" in result:
+    if "Error in validator agent tool" in result or "Error: " in result:
         return {
             "toolUseId": tool_use_id,
             "status": "error",

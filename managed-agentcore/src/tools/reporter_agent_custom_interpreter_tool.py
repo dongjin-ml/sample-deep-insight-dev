@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from src.utils.strands_sdk_utils import strands_utils
 from src.prompts.template import apply_prompt_template
 from src.utils.common_utils import get_message_from_string
-from src.tools import custom_interpreter_python_tool, custom_interpreter_bash_tool
+from src.tools import custom_interpreter_write_and_execute_tool, custom_interpreter_bash_tool
 from src.utils.strands_sdk_utils import TokenTracker
 
 # Observability
@@ -89,6 +89,24 @@ def handle_reporter_agent_custom_interpreter_tool(task: Annotated[str, "The repo
         request_prompt, full_plan = shared_state.get("request_prompt", ""), shared_state.get("full_plan", "")
         clues, messages = shared_state.get("clues", ""), shared_state.get("messages", [])
 
+        # Check for data directory
+        data_directory = shared_state.get("data_directory")
+
+        # Fargate session creation with data
+        from src.tools.global_fargate_coordinator import get_global_session
+        fargate_manager = get_global_session()
+
+        if data_directory:
+            # Directory upload (recursive)
+            logger.info(f"{Colors.GREEN}📂 Creating custom interpreter session with directory data: {data_directory}{Colors.END}")
+            if not fargate_manager.ensure_session_with_directory(data_directory):
+                return "Error: Failed to create custom interpreter session with directory data"
+        else:
+            # No data to upload
+            logger.info(f"{Colors.GREEN}📦 Creating standard custom interpreter session (no data){Colors.END}")
+            if not fargate_manager.ensure_session():
+                return "Error: Failed to create custom interpreter session"
+
         # Create reporter agent with custom interpreter tools using consistent pattern
         logger.info(f"{Colors.BLUE}📦 Creating reporter agent with custom interpreter tools{Colors.END}")
         reporter_agent = strands_utils.get_agent(
@@ -105,7 +123,7 @@ def handle_reporter_agent_custom_interpreter_tool(task: Annotated[str, "The repo
             enable_reasoning=False,
             prompt_cache_info=(True, "default"),  # enable prompt caching for reporter agent
             tool_cache=True,
-            tools=[custom_interpreter_python_tool, custom_interpreter_bash_tool],  # Custom interpreter tools
+            tools=[custom_interpreter_write_and_execute_tool, custom_interpreter_bash_tool],  # Custom interpreter tools
             streaming=True  # Enable streaming for consistency
         )
 
@@ -169,7 +187,7 @@ def reporter_agent_custom_interpreter_tool(tool: ToolUse, **_kwargs: Any) -> Too
     result = handle_reporter_agent_custom_interpreter_tool(task)
 
     # Check if execution was successful based on the result string
-    if "Error in reporter agent tool" in result or "Error: No shared state available" in result:
+    if "Error in reporter agent tool" in result or "Error: " in result:
         return {
             "toolUseId": tool_use_id,
             "status": "error",

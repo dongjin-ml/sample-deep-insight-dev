@@ -67,7 +67,17 @@ def section_exists(doc, heading_text):
             return True
     return False
 
+def strip_markdown(text):
+    """Remove markdown formatting from text"""
+    import re
+    text = re.sub(r'^#{{1,6}}\s*', '', text)  # Remove heading markers
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)  # Remove bold **text**
+    text = re.sub(r'\*(.+?)\*', r'\1', text)  # Remove italic *text*
+    text = re.sub(r'`(.+?)`', r'\1', text)  # Remove inline code
+    return text.strip()
+
 def add_heading(doc, text, level=1):
+    text = strip_markdown(text)  # Clean markdown before adding
     heading = doc.add_heading(text, level=level)
     if heading.runs:
         sizes, colors = {{1: 24, 2: 18, 3: 16}}, {{1: RGBColor(44, 90, 160), 2: RGBColor(52, 73, 94), 3: RGBColor(44, 62, 80)}}
@@ -76,6 +86,7 @@ def add_heading(doc, text, level=1):
     return heading
 
 def add_paragraph(doc, text):
+    text = strip_markdown(text)  # Clean markdown before adding
     para = doc.add_paragraph()
     run = para.add_run(text)
     apply_korean_font(run, font_size=10.5)
@@ -201,8 +212,8 @@ write_and_execute_tool(
 ```
 
 **SECONDARY TOOLS:**
-- `bash_tool`: ls, head, file operations only
 - `file_read`: Read all_results.txt, citations.json
+- `bash_tool`: ls, head, file operations, `pip install` (install missing packages as needed)
 
 **File Structure:**
 - Code: ./artifacts/code/reporter_*.py

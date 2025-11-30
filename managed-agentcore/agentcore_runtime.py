@@ -646,7 +646,7 @@ async def agentcore_streaming_execution(
             print(f"🚀 Launching AgentCore Runtime with query: {user_query[:100]}...")
 
             # Step 5: Stream events from graph execution
-            STREAM_EVENT_TYPES = {"agent_usage_stream", "agent_reasoning_stream", "agent_text_stream", "workflow_complete"}
+            STREAM_EVENT_TYPES = {"agent_usage_stream", "agent_reasoning_stream", "agent_text_stream", "workflow_complete"}#, "agent_tool_stream"}
             event_count = 0
             streamed_count = 0
             async for event in graph.stream_async(graph_input):
