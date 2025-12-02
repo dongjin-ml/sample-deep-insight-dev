@@ -133,7 +133,7 @@ For detailed cleanup instructions, see: [`production_deployment/scripts/README.m
 │       └── CLOUDFORMATION_GUIDE.md
 │
 ├── src/                         # 🤖 Agent Source Code
-│   ├── graph/                   # LangGraph workflow definitions
+│   ├── graph/                   # Strands workflow definitions
 │   ├── tools/                   # Fargate integration tools
 │   ├── prompts/                 # Agent prompts
 │   └── utils/                   # Utilities

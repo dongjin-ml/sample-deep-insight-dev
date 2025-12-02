@@ -5,12 +5,14 @@ import os
 import asyncio
 from typing import Any, Annotated
 from strands.types.tools import ToolResult, ToolUse
+from strands.tools.tools import PythonAgentTool
 from strands.types.content import ContentBlock
 from dotenv import load_dotenv
 from src.utils.strands_sdk_utils import strands_utils
 from src.prompts.template import apply_prompt_template
 from src.utils.common_utils import get_message_from_string
-from src.tools import custom_interpreter_write_and_execute_tool, custom_interpreter_bash_tool
+from src.tools.custom_interpreter_write_and_execute_tool import custom_interpreter_write_and_execute_tool
+from src.tools.custom_interpreter_bash_tool import custom_interpreter_bash_tool
 from src.utils.strands_sdk_utils import TokenTracker
 
 # Observability
@@ -51,7 +53,7 @@ class Colors:
     BLUE = '\033[94m'
     END = '\033[0m'
 
-def handle_reporter_agent_custom_interpreter_tool(task: Annotated[str, "The reporting task or instruction for generating the report."]):
+def _handle_reporter_agent_custom_interpreter_tool(task: Annotated[str, "The reporting task or instruction for generating the report."]):
     """
     Generate comprehensive reports based on analysis results using a specialized reporter agent with custom code interpreter.
 
@@ -179,12 +181,12 @@ def handle_reporter_agent_custom_interpreter_tool(task: Annotated[str, "The repo
         return result_text
 
 # Function name must match tool name
-def reporter_agent_custom_interpreter_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
+def _reporter_agent_custom_interpreter_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     task = tool["input"]["task"]
 
     # Use the existing handle_reporter_agent_custom_interpreter_tool function
-    result = handle_reporter_agent_custom_interpreter_tool(task)
+    result = _handle_reporter_agent_custom_interpreter_tool(task)
 
     # Check if execution was successful based on the result string
     if "Error in reporter agent tool" in result or "Error: " in result:
@@ -200,3 +202,5 @@ def reporter_agent_custom_interpreter_tool(tool: ToolUse, **_kwargs: Any) -> Too
             "content": [{"text": result}]
         }
 
+# Wrap with PythonAgentTool for proper Strands SDK registration
+reporter_agent_custom_interpreter_tool = PythonAgentTool("reporter_agent_custom_interpreter_tool", TOOL_SPEC, _reporter_agent_custom_interpreter_tool)

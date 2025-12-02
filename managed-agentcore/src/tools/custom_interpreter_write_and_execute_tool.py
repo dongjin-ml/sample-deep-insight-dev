@@ -5,6 +5,7 @@ import logging
 import base64
 from typing import Any, Annotated
 from strands.types.tools import ToolResult, ToolUse
+from strands.tools.tools import PythonAgentTool
 from src.tools.decorators import log_io
 from src.tools.global_fargate_coordinator import get_global_session
 
@@ -56,7 +57,7 @@ class Colors:
     END = '\033[0m'
 
 @log_io
-def handle_custom_interpreter_write_and_execute_tool(
+def _handle_custom_interpreter_write_and_execute_tool(
     file_path: Annotated[str, "The path where the script should be written"],
     content: Annotated[str, "The Python script content to write and execute"],
     execute_cmd: Annotated[str, "The bash command to execute the script"] = None,
@@ -214,7 +215,7 @@ print(f"{{num_lines}}|{{file_size}}")
             return "\n".join(results)
 
 # Function name must match tool name
-def custom_interpreter_write_and_execute_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
+def _custom_interpreter_write_and_execute_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     file_path = tool["input"]["file_path"]
     content = tool["input"]["content"]
@@ -222,7 +223,7 @@ def custom_interpreter_write_and_execute_tool(tool: ToolUse, **_kwargs: Any) -> 
     timeout = tool["input"].get("timeout", 300)
 
     # Use the existing handle function
-    result = handle_custom_interpreter_write_and_execute_tool(file_path, content, execute_cmd, timeout)
+    result = _handle_custom_interpreter_write_and_execute_tool(file_path, content, execute_cmd, timeout)
 
     # Check if execution had errors (same as write_and_execute_tool.py)
     if "✗ Error" in result or "✗ Execution failed" in result or "✗ Execution timed out" in result:
@@ -239,6 +240,9 @@ def custom_interpreter_write_and_execute_tool(tool: ToolUse, **_kwargs: Any) -> 
         }
 
 
+# Wrap with PythonAgentTool for proper Strands SDK registration
+custom_interpreter_write_and_execute_tool = PythonAgentTool("custom_interpreter_write_and_execute_tool", TOOL_SPEC, _custom_interpreter_write_and_execute_tool)
+
 if __name__ == "__main__":
     # Test example
     test_code = '''
@@ -246,7 +250,7 @@ print("Hello from write_and_execute!")
 import sys
 print(f"Python version: {sys.version}")
 '''
-    print(handle_custom_interpreter_write_and_execute_tool(
+    print(_handle_custom_interpreter_write_and_execute_tool(
         "./artifacts/test_script.py",
         test_code
     ))

@@ -4,6 +4,7 @@ import os
 import logging
 from typing import Any, Annotated
 from strands.types.tools import ToolResult, ToolUse
+from strands.tools.tools import PythonAgentTool
 from src.tools.decorators import log_io
 from src.tools.global_fargate_coordinator import get_global_session
 
@@ -42,7 +43,7 @@ class Colors:
     END = '\033[0m'
 
 @log_io
-def handle_custom_interpreter_python_tool(code: Annotated[str, "The python code to execute to do further analysis or calculation."]):
+def _handle_custom_interpreter_python_tool(code: Annotated[str, "The python code to execute to do further analysis or calculation."]):
     """
     Use this to execute python code and do data analysis or calculation using custom code interpreter.
     If you want to see the output of a value, you should print it out with `print(...)`. This is visible to the user.
@@ -175,12 +176,12 @@ def handle_custom_interpreter_python_tool(code: Annotated[str, "The python code 
             return error_msg
 
 # Function name must match tool name
-def custom_interpreter_python_tool(tool: ToolUse, **kwargs: Any) -> ToolResult:
+def _custom_interpreter_python_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     code = tool["input"]["code"]
 
     # Use the existing handle_custom_interpreter_python_tool function
-    result = handle_custom_interpreter_python_tool(code)
+    result = _handle_custom_interpreter_python_tool(code)
 
     # Check if execution was successful based on the result string
     if "Failed to execute" in result:
@@ -196,3 +197,5 @@ def custom_interpreter_python_tool(tool: ToolUse, **kwargs: Any) -> ToolResult:
             "content": [{"text": result}]
         }
 
+# Wrap with PythonAgentTool for proper Strands SDK registration
+custom_interpreter_python_tool = PythonAgentTool("custom_interpreter_python_tool", TOOL_SPEC, _custom_interpreter_python_tool)

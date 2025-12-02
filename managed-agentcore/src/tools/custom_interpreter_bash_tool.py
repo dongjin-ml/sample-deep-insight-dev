@@ -4,6 +4,7 @@ import os
 import logging
 from typing import Any, Annotated
 from strands.types.tools import ToolResult, ToolUse
+from strands.tools.tools import PythonAgentTool
 from src.tools.decorators import log_io
 from src.tools.global_fargate_coordinator import get_global_session
 
@@ -39,7 +40,7 @@ class Colors:
     END = '\033[0m'
 
 @log_io
-def handle_custom_interpreter_bash_tool(cmd: Annotated[str, "The bash command to be executed."]):
+def _handle_custom_interpreter_bash_tool(cmd: Annotated[str, "The bash command to be executed."]):
     """Use this to execute bash command and do necessary operations using custom code interpreter."""
 
     tracer = trace.get_tracer(
@@ -99,12 +100,12 @@ def handle_custom_interpreter_bash_tool(cmd: Annotated[str, "The bash command to
             return error_message
 
 # Function name must match tool name
-def custom_interpreter_bash_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
+def _custom_interpreter_bash_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     cmd = tool["input"]["cmd"]
 
     # Use the existing handle_custom_interpreter_bash_tool function
-    result = handle_custom_interpreter_bash_tool(cmd)
+    result = _handle_custom_interpreter_bash_tool(cmd)
 
     # Check if execution was successful based on the result string
     if "Command failed" in result or "Error executing command" in result:
@@ -120,6 +121,9 @@ def custom_interpreter_bash_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
             "content": [{"text": result}]
         }
 
+# Wrap with PythonAgentTool for proper Strands SDK registration
+custom_interpreter_bash_tool = PythonAgentTool("custom_interpreter_bash_tool", TOOL_SPEC, _custom_interpreter_bash_tool)
+
 if __name__ == "__main__":
     # Test example using the handle_custom_interpreter_bash_tool function directly
-    print(handle_custom_interpreter_bash_tool("ls -la"))
+    print(_handle_custom_interpreter_bash_tool("ls -la"))

@@ -5,12 +5,14 @@ import os
 import asyncio
 from typing import Any, Annotated, Dict, List
 from strands.types.tools import ToolResult, ToolUse
+from strands.tools.tools import PythonAgentTool
 from strands.types.content import ContentBlock
 from dotenv import load_dotenv
 from src.utils.strands_sdk_utils import strands_utils
 from src.prompts.template import apply_prompt_template
 from src.utils.common_utils import get_message_from_string
-from src.tools import custom_interpreter_write_and_execute_tool, custom_interpreter_bash_tool
+from src.tools.custom_interpreter_write_and_execute_tool import custom_interpreter_write_and_execute_tool
+from src.tools.custom_interpreter_bash_tool import custom_interpreter_bash_tool
 from src.utils.strands_sdk_utils import TokenTracker
 
 # Observability
@@ -93,7 +95,7 @@ class FargateValidator:
 
         return priority_calcs, stats
 
-def handle_validator_agent_custom_interpreter_tool(task: Annotated[str, "The validation task or instruction for validating calculations and generating citations."]):
+def _handle_validator_agent_custom_interpreter_tool(task: Annotated[str, "The validation task or instruction for validating calculations and generating citations."]):
     """
     Validate numerical calculations and generate citation metadata for reports using AWS Fargate containers.
 
@@ -214,12 +216,12 @@ def handle_validator_agent_custom_interpreter_tool(task: Annotated[str, "The val
         return result_text
 
 # Function name must match tool name
-def validator_agent_custom_interpreter_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
+def _validator_agent_custom_interpreter_tool(tool: ToolUse, **_kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     task = tool["input"]["task"]
 
     # Use the existing handle function
-    result = handle_validator_agent_custom_interpreter_tool(task)
+    result = _handle_validator_agent_custom_interpreter_tool(task)
 
     # Check if execution was successful based on the result string
     if "Error in validator agent tool" in result or "Error: " in result:
@@ -234,3 +236,6 @@ def validator_agent_custom_interpreter_tool(tool: ToolUse, **_kwargs: Any) -> To
             "status": "success",
             "content": [{"text": result}]
         }
+
+# Wrap with PythonAgentTool for proper Strands SDK registration
+validator_agent_custom_interpreter_tool = PythonAgentTool("validator_agent_custom_interpreter_tool", TOOL_SPEC, _validator_agent_custom_interpreter_tool)

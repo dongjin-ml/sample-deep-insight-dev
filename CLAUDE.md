@@ -498,27 +498,38 @@ uv run 03_download_artifacts.py
 
 ## File Location Context
 
-**Current working directory**: `/home/ubuntu/projects/sample-deep-insight/managed-agentcore`
+The repository contains two main deployment options at the root:
+- `self-hosted/` - Self-hosted deployment with UV environment
+- `managed-agentcore/` - AWS-managed AgentCore deployment
 
-When user refers to files without explicit paths:
-- Python scripts (01_*.py, 02_*.py) are in the current directory
-- Phase scripts are in `production_deployment/scripts/phase{1,2,3,4}/`
-- Source code is in `src/` (shared between self-hosted and managed-agentcore)
-- CloudFormation templates are in `production_deployment/cloudformation/`
+When user refers to files without explicit paths, determine context from the conversation:
+- For self-hosted: `main.py` is in `self-hosted/`, source code in `self-hosted/src/`
+- For managed-agentcore: Python scripts (01_*.py, 02_*.py, 03_*.py) are in `managed-agentcore/`
+- Phase scripts are in `managed-agentcore/production_deployment/scripts/phase{1,2,3,4}/`
+- CloudFormation templates are in `managed-agentcore/production_deployment/cloudformation/`
 
 ## Documentation References
 
-- **Production Deployment**: See `production_deployment/README.md` for complete deployment workflow
-- **Script Reference**: See `production_deployment/scripts/README.md` for detailed script documentation
-- **Multi-Region Guide**: See `production_deployment/docs/MULTI_REGION_DEPLOYMENT.md`
-- **Development Log**: See `managed-agentcore/CLAUDE.md` (Korean) for detailed issue history and resolutions
+- **Production Deployment**: See `managed-agentcore/production_deployment/README.md` for complete deployment workflow
+- **Script Reference**: See `managed-agentcore/production_deployment/scripts/README.md` for detailed script documentation
+- **Multi-Region Guide**: See `managed-agentcore/production_deployment/docs/MULTI_REGION_DEPLOYMENT.md`
+- **GEPA Optimizer**: See `self-hosted/gepa-optimizer/README.md` for prompt optimization toolkit
 
 ## Related Files
 
-When working with managed-agentcore, commonly modified files:
-- Agent nodes: `src/graph/nodes.py` (coordinator, planner, supervisor)
-- Graph builder: `src/graph/builder.py` (workflow definition)
-- Fargate controller: `src/tools/fargate_container_controller.py` (container lifecycle)
-- Cookie management: `src/tools/cookie_acquisition_subprocess.py` (ALB communication)
-- Runtime creation: `01_create_agentcore_runtime_vpc.py` (runtime deployment)
-- Runtime invocation: `02_invoke_agentcore_runtime_vpc.py` (testing)
+**Self-hosted commonly modified files**:
+- Entry point: `self-hosted/main.py`
+- Agent nodes: `self-hosted/src/graph/nodes.py` (coordinator, planner, supervisor)
+- Graph builder: `self-hosted/src/graph/builder.py` (workflow definition)
+- Tool agents: `self-hosted/src/tools/` (coder, reporter, validator, tracker)
+- System prompts: `self-hosted/src/prompts/*.md`
+- Streamlit app: `self-hosted/app/app.py`
+
+**Managed-agentcore commonly modified files**:
+- Agent nodes: `managed-agentcore/src/graph/nodes.py` (coordinator, planner, supervisor)
+- Graph builder: `managed-agentcore/src/graph/builder.py` (workflow definition)
+- Fargate controller: `managed-agentcore/src/tools/fargate_container_controller.py` (container lifecycle)
+- Cookie management: `managed-agentcore/src/tools/cookie_acquisition_subprocess.py` (ALB communication)
+- Runtime creation: `managed-agentcore/01_create_agentcore_runtime_vpc.py` (runtime deployment)
+- Runtime invocation: `managed-agentcore/02_invoke_agentcore_runtime_vpc.py` (testing)
+- Fargate executor: `managed-agentcore/fargate-runtime/dynamic_executor_v2.py` (code execution server)
