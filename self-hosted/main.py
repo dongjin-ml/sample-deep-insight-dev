@@ -18,7 +18,7 @@ from src.utils.event_queue import clear_queue
 
 def remove_artifact_folder(folder_path="./artifacts/"):
     """
-    ./artifact/ 폴더가 존재하면 삭제하는 함수
+    ./artifhowact/ 폴더가 존재하면 삭제하는 함수
 
     Args:
         folder_path (str): 삭제할 폴더 경로
