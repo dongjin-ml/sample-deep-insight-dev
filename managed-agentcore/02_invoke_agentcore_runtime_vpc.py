@@ -131,7 +131,9 @@ if not AGENT_ARN:
 #DEFAULT_PROMPT = "데이터 디렉토리의 모든 CSV 파일을 분석하고 이 Moon Market 데이터에서 비즈니스 성장 기회를 발굴해줘: 숨겨진 고객 패턴과 세그먼트를 발견하고, 수익 최적화 방안을 제시하며, 마케팅과 운영 효율성을 높일 수 있는 개선점을 찾고, 다음 달 매출을 크게 늘릴 수 있는 실행 가능한 전략 3가지를 우선순위와 기대 효과를 포함해서 제안해줘." 
 
 DEFAULT_PROMPT = textwrap.dedent("""
-                분석대상은 './data/moon_market/kr/' 입니다. 
+                분석대상은 ‘./data/moon_market/kr/’ 디렉토리 입니다.
+                moon-market-fresh-food-sales.csv 는 분석 파일이고,
+                column_definitions.json은 컬럼에 대한 설명입니다.
                 데이터에서 비즈니스 성장 기회를 발굴해줘: 
                 숨겨진 고객 패턴과 세그먼트를 발견하고, 수익 최적화 방안을 제시하며, 
                 마케팅과 운영 효율성을 높일 수 있는 개선점을 찾고, 
