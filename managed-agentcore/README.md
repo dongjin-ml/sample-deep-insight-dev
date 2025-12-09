@@ -87,37 +87,23 @@ A Multi-Agent system built on AWS Bedrock AgentCore Runtime that analyzes large 
 
 ### Prerequisites
 
-| Tool | Version | Required For |
-|------|---------|--------------|
-| AWS CLI | v2.x | All phases |
-| Docker | 20.x+ | Phase 2 (build container image) |
-| jq | 1.6+ | Phase 3 (parse CloudFormation outputs) |
-| uv | 0.4+ | Phase 3 (Python environment) |
-| Python | 3.12+ | Phase 4 (runtime scripts) |
+| Tool | Version | Required For | Check Command |
+|------|---------|--------------|---------------|
+| AWS CLI | v2.x | All phases | `aws --version` |
+| Docker | 20.x+ | Phase 2 | `docker --version` |
+| jq | 1.6+ | Phase 3 | `jq --version` |
+| uv | 0.4+ | Phase 3 | `uv --version` |
+| Python | 3.12+ | Phase 4 | `python3 --version` |
 
 ```bash
-# Check versions
-aws --version        # aws-cli/2.x.x required
-docker --version     # Docker 20.x+
-jq --version         # jq-1.6+
-uv --version         # uv 0.4+
-python3 --version    # Python 3.12+
+# Quick verification (run from managed-agentcore/)
+./production_deployment/scripts/check_prerequisites.sh
 
-# Install missing tools (Ubuntu/Debian)
-sudo apt-get update && sudo apt-get install -y jq
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Update AWS CLI if needed
-# Linux x86_64
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-# Linux ARM64 (Graviton)
-# curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
-unzip -o awscliv2.zip && sudo ./aws/install --update
-
-# macOS (Apple Silicon M1/M2/M3 or Intel)
-# curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
-# sudo installer -pkg AWSCLIV2.pkg -target /
+# Auto-install missing tools
+./production_deployment/scripts/check_prerequisites.sh --install
 ```
+
+> 📖 **[Detailed installation guide →](production_deployment/docs/PREREQUISITES.md)** Step-by-step instructions for all platforms (Linux x86_64, ARM64, macOS)
 
 ### Production Deployment
 
@@ -235,46 +221,52 @@ Supports deployment to **9 AWS regions**:
 
 ## 🗑️ Cleanup
 
-### Complete Cleanup (All Phases)
+### Recommended: Two-Step Cleanup
 
-**Single command** to delete all resources in the correct order:
+Due to ENI (Elastic Network Interface) release timing, **cleanup requires two steps**:
 
 ```bash
+# Step 1: Delete Phase 4 (AgentCore Runtime)
+cd production_deployment/scripts/phase4
+./cleanup.sh prod --region us-west-2
+
+# Step 2: Wait ~6 hours for ENI release, then delete remaining phases
 cd production_deployment/scripts
 ./cleanup_all.sh prod us-west-2
 ```
 
-This will delete:
+**⚠️ Why two steps?** AgentCore Runtime creates ENIs in your VPC. These ENIs take ~6 hours to be released after runtime deletion. Phase 1/2 cleanup will fail if ENIs are still attached.
+
+### What Gets Deleted
+
 - Phase 4: AgentCore Runtime + CloudWatch logs
 - Phase 3: UV environment, .env file, symlinks
 - Phase 2: ECS cluster, ECR repository, Docker images
 - Phase 1: VPC, subnets, security groups, ALB, IAM roles
 - S3 buckets (templates + session data)
 
-**⚠️ WARNING**: You must type "DELETE" to confirm. This action is irreversible!
-- After the Phase 4 is finished, run the rest of them because ENI in AgentCore runtime will be deleted after about 6 hours.
-
 ### Manual Cleanup (Individual Phases)
 
-If you need to clean up specific phases:
-
 ```bash
-# Phase 4: Delete Runtime only (region REQUIRED)
+# Phase 4: Delete Runtime
 cd production_deployment/scripts/phase4
 ./cleanup.sh prod --region us-west-2
 
-# Phase 2: Delete Fargate resources (region REQUIRED)
+# ⏳ Wait ~6 hours for ENI release before proceeding
+
+# Phase 3: Delete local environment (manual)
+cd managed-agentcore
+rm -rf .venv .env pyproject.toml
+rm -rf production_deployment/scripts/phase3/.venv production_deployment/scripts/phase3/uv.lock
+
+# Phase 2: Delete Fargate resources
 cd production_deployment/scripts/phase2
 ./cleanup.sh prod --region us-west-2
 
-# Phase 1: Delete VPC infrastructure (region REQUIRED)
+# Phase 1: Delete VPC infrastructure
 cd production_deployment/scripts/phase1
 ./cleanup.sh prod --region us-west-2
 ```
-
-**Important**: Always delete in reverse order (4 → 3 → 2 → 1)
-
-For detailed cleanup instructions, see: [`production_deployment/scripts/README.md#cleanup`](production_deployment/scripts/README.md#-cleanup-order-enforcement)
 
 ---
 
