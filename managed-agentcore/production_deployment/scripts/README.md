@@ -60,7 +60,6 @@ Key Point: deploy_phase1_phase2.sh is a WRAPPER that calls the same
 | **01_create_agentcore_runtime_vpc.py** | Phase 4: Create AgentCore Runtime | `uv run 01_create_agentcore_runtime_vpc.py` |
 | **02_invoke_agentcore_runtime_vpc.py** | Phase 4: Test runtime invocation | `uv run 02_invoke_agentcore_runtime_vpc.py` |
 | **03_download_artifacts.py** | Phase 4: Download S3 artifacts | `uv run 03_download_artifacts.py [session_id]` |
-| **phase4/verify.sh** | Phase 4: Verify runtime status | `cd phase4 && ./verify.sh` |
 | **phase4/cleanup.sh** | Phase 4: Delete runtime | `cd phase4 && ./cleanup.sh prod` |
 
 ---
@@ -563,66 +562,6 @@ artifacts/
 - **Error: No sessions found** → Run `02_invoke_agentcore_runtime_vpc.py` first
 - **Error: S3 access denied** → Check IAM permissions for S3 bucket
 - **Error: Session not found** → Verify session ID exists in S3
-
----
-
-### phase4/verify.sh
-
-**Purpose**: Verify AgentCore Runtime is in READY state and properly configured.
-
-**Syntax**:
-```bash
-cd production_deployment/scripts/phase4
-./verify.sh
-```
-
-**Prerequisites**:
-- ✅ Runtime created (`01_create_agentcore_runtime_vpc.py`)
-- ✅ `RUNTIME_ARN` in `.env` file
-
-**What it checks**:
-1. Runtime exists and is accessible
-2. Runtime status is READY (not CREATING, FAILED, DELETING)
-3. Network configuration (VPC mode, subnets, security groups)
-4. Fargate configuration (cluster, task definition, container)
-5. CloudWatch log groups exist
-6. OTEL observability enabled
-
-**Output**:
-```bash
-✅ AgentCore Runtime Verification
-
-Runtime Status:
-  ID:              deep_insight_runtime_vpc-abc123XYZ
-  Status:          READY ✅
-  Network Mode:    VPC
-  Created:         2025-11-08 12:00:00
-
-Network Configuration:
-  Subnets:         subnet-xxx, subnet-yyy ✅
-  Security Groups: sg-xxx ✅
-
-Fargate Configuration:
-  Cluster:         deep-insight-cluster-prod ✅
-  Task Definition: deep-insight-fargate-task-prod ✅
-  Container:       fargate-runtime ✅
-
-CloudWatch Logs:
-  Log Group:       /aws/bedrock-agentcore/runtimes/deep_insight_runtime_vpc-abc123XYZ ✅
-  Streams:         3 invocation log streams
-
-Observability:
-  OTEL Enabled:    Yes ✅
-  Per-Invocation:  Yes ✅
-
-✅ All checks passed!
-```
-
-**When to use**:
-- After runtime creation
-- Debugging runtime issues
-- Before running invocations
-- Periodic health checks
 
 ---
 
@@ -1235,10 +1174,8 @@ After Phase 2 deployment, run `./phase2/setup_env.sh` to generate `.env` file wi
 
 ## 📚 Additional Documentation
 
-- **Main README**: `../README.md`
+- **Main README**: `../../README.md`
 - **Multi-Region Guide**: `../docs/MULTI_REGION_DEPLOYMENT.md`
-- **AZ Documentation**: `../docs/bedrock_agentcore_vpc_regions.md`
-- **CloudFormation Guide**: `../docs/CLOUDFORMATION_GUIDE.md`
 
 ---
 

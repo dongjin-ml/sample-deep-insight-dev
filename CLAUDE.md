@@ -1,3 +1,5 @@
+Ask me before doing actions.
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -92,10 +94,6 @@ uv run 02_invoke_agentcore_runtime_vpc.py
 
 # Download artifacts
 uv run 03_download_artifacts.py
-
-# Verify runtime status
-cd production_deployment/scripts/phase4
-./verify.sh
 ```
 
 **Cleanup (all resources)**:

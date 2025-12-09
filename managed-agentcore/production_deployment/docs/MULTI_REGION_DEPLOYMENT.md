@@ -62,7 +62,14 @@ Using the same hardcoded AZ name across accounts will cause failures.
 | Europe (Ireland) | `eu-west-1` | `euw1-az1`, `euw1-az2`, `euw1-az3` |
 | Europe (Frankfurt) | `eu-central-1` | `euc1-az1`, `euc1-az2`, `euc1-az3` |
 
-**See also**: `bedrock_agentcore_vpc_regions.md` for detailed AZ documentation.
+### How to Find Your AZ Names from AZ IDs
+
+```bash
+# List all AZs in a region with their IDs
+aws ec2 describe-availability-zones --region us-east-1 \
+  --query 'AvailabilityZones[*].{Name:ZoneName, ID:ZoneId}' \
+  --output table
+```
 
 ---
 
@@ -454,8 +461,7 @@ Account B:  us-east-1a → use1-az6 ❌ NOT Supported
 **Cause**: Region does not support Bedrock AgentCore VPC mode.
 
 **Solution**:
-- Verify region is in the supported list (9 regions)
-- See `bedrock_agentcore_vpc_regions.md` for complete list
+- Verify region is in the supported list (9 regions) - see [Supported Regions and AZ IDs](#supported-regions-and-az-ids)
 - Choose a different region if needed
 
 ---
@@ -463,9 +469,9 @@ Account B:  us-east-1a → use1-az6 ❌ NOT Supported
 ## 📚 Additional Resources
 
 - **AZ Verification Script**: `scripts/phase1/verify_agentcore_azs.sh`
-- **Region/AZ Documentation**: `docs/bedrock_agentcore_vpc_regions.md`
 - **CloudFormation Parameters**: `cloudformation/phase1-main.yaml` (lines 19-58)
 - **Deployment Scripts**: `scripts/phase1/deploy.sh`, `scripts/phase2/deploy.sh`
+- **AWS Documentation**: [AgentCore VPC Configuration](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-vpc.html)
 
 ---
 
