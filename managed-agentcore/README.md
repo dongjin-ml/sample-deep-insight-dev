@@ -40,6 +40,8 @@ A Multi-Agent system built on AWS Bedrock AgentCore Runtime that analyzes large 
 - 📄 **Reporter Agent** - Automatic DOCX report generation
 - 📋 **Tracker Agent** - Workflow progress monitoring and task tracking
 
+> 📖 **[Compare with Self-Hosted →](production_deployment/docs/DEPLOYMENT_COMPARISON.md)** When to choose each option, feature comparison, and migration path
+
 ---
 
 ## 📊 Architecture
@@ -272,9 +274,10 @@ cd production_deployment/scripts/phase1
 
 ## 📚 Documentation
 
-- **[production_deployment/scripts/README.md](production_deployment/scripts/README.md)** - Scripts reference
+- **[production_deployment/docs/DEPLOYMENT_COMPARISON.md](production_deployment/docs/DEPLOYMENT_COMPARISON.md)** - Self-Hosted vs Managed AgentCore comparison
 - **[production_deployment/docs/DEPLOYMENT_OUTPUTS.md](production_deployment/docs/DEPLOYMENT_OUTPUTS.md)** - What each script creates
 - **[production_deployment/docs/MULTI_REGION_DEPLOYMENT.md](production_deployment/docs/MULTI_REGION_DEPLOYMENT.md)** - Multi-region deployment
+- **[production_deployment/scripts/README.md](production_deployment/scripts/README.md)** - Scripts reference
 
 ---
 

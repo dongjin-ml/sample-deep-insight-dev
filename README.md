@@ -19,6 +19,7 @@
 
 ## *Latest News* 🔥
 
+- **[2025/12]** Managed AgentCore deployment - production-ready with Bedrock AgentCore Runtime, Custom Code Interpreter (Fargate), and 100% private VPC
 - **[2025/12]** File-based code execution - significantly reduces NameError/ImportError rates compared to REPL-based approaches
 - **[2025/12]** Output token optimization with shared utils scripts - repeatedly used functions are generated once and imported, reducing redundant code generation
 - **[2025/11]** Added per-agent token tracking with detailed metrics - monitor input/output tokens and cache reads/writes for complete cost visibility and optimization
@@ -68,20 +69,23 @@ Run agents locally or in your VPC with full control:
 ### Managed AgentCore Deployment
 
 Production deployment using AWS Bedrock AgentCore Runtime with VPC Private Mode:
-- ✅ AWS-managed infrastructure with CloudFormation
+- ✅ Bedrock AgentCore Runtime hosting Strands Agent
+- ✅ Custom Code Interpreter (ECR + ALB + Fargate)
 - ✅ 100% private network (VPC endpoints, no public internet)
-- ✅ Dynamic Fargate containers for code execution
 
 **Get Started**: [`./managed-agentcore/`](./managed-agentcore/) | 📖 [Managed AgentCore README](./managed-agentcore/README.md)
 
 ## Deployment Options
 
-| Feature | Self-Hosted | Managed AgentCore |
-|---------|-------------|-------------------|
+| | Self-Hosted | Managed AgentCore |
+|---|-------------|-------------------|
 | Setup Time | ~10 minutes | ~45 minutes |
-| Infrastructure | Local/EC2 | AWS Fargate + VPC |
+| Agent Hosting | Local/EC2 | Bedrock AgentCore Runtime |
+| Code Execution | Local Python | Custom Code Interpreter (Fargate) |
 | Network | Your choice | 100% Private VPC |
 | Best For | Development, Testing | Production, Enterprise |
+
+> 📖 **[Detailed comparison →](./managed-agentcore/production_deployment/docs/DEPLOYMENT_COMPARISON.md)** Security, cost, features, and when to choose each option
 
 ---
 
