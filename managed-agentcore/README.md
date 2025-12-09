@@ -86,6 +86,33 @@ A Multi-Agent system built on AWS Bedrock AgentCore Runtime that analyzes large 
 
 ## 🚀 Quick Start
 
+### Prerequisites
+
+| Tool | Version | Required For |
+|------|---------|--------------|
+| AWS CLI | v2.x | All phases |
+| Docker | 20.x+ | Phase 2 (build container image) |
+| jq | 1.6+ | Phase 3 (parse CloudFormation outputs) |
+| uv | 0.4+ | Phase 3 (Python environment) |
+| Python | 3.12+ | Phase 4 (runtime scripts) |
+
+```bash
+# Check versions
+aws --version        # aws-cli/2.x.x required
+docker --version     # Docker 20.x+
+jq --version         # jq-1.6+
+uv --version         # uv 0.4+
+python3 --version    # Python 3.12+
+
+# Install missing tools (Ubuntu/Debian)
+sudo apt-get update && sudo apt-get install -y jq
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Update AWS CLI if needed
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip && sudo ./aws/install --update
+```
+
 ### Production Deployment
 
 Four-phase deployment:
@@ -245,8 +272,9 @@ For detailed cleanup instructions, see: [`production_deployment/scripts/README.m
 
 ## 📚 Documentation
 
-- **[production_deployment/scripts/README.md](production_deployment/scripts/README.md)** - All scripts reference & deployment guide
-- **[production_deployment/docs/MULTI_REGION_DEPLOYMENT.md](production_deployment/docs/MULTI_REGION_DEPLOYMENT.md)** - Multi-region & multi-account deployment
+- **[production_deployment/scripts/README.md](production_deployment/scripts/README.md)** - Scripts reference
+- **[production_deployment/docs/DEPLOYMENT_OUTPUTS.md](production_deployment/docs/DEPLOYMENT_OUTPUTS.md)** - What each script creates
+- **[production_deployment/docs/MULTI_REGION_DEPLOYMENT.md](production_deployment/docs/MULTI_REGION_DEPLOYMENT.md)** - Multi-region deployment
 
 ---
 

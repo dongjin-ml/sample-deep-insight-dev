@@ -6,6 +6,21 @@
 
 ---
 
+## 📋 Prerequisites
+
+```bash
+# AWS CLI v2
+aws --version   # aws-cli/2.x.x required
+
+# jq (JSON processor)
+jq --version    # Required for parsing CloudFormation outputs
+
+# Install if missing (Ubuntu/Debian)
+sudo apt-get update && sudo apt-get install -y jq
+```
+
+---
+
 ## 📂 Script Overview
 
 | Script | Purpose |
@@ -206,6 +221,29 @@ Delete in reverse order: Phase 4 → 3 → 2 → 1. If stuck, wait for ENIs to r
 ### Docker build fails in Phase 2
 
 Run `./phase3/03_patch_dockerignore.sh` before Phase 2 deployment.
+
+### "Invalid type for parameter" during deployment
+
+**Symptom:**
+```
+Invalid type for parameter [0], value: OrderedDict([('ParameterKey', 'Environment'), ...
+```
+
+**Cause:** Outdated AWS CLI version.
+
+**Solution:** Update AWS CLI:
+```bash
+# Check current version
+aws --version
+
+# Update AWS CLI (Linux)
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install --update
+
+# Verify update
+aws --version
+```
 
 ---
 
