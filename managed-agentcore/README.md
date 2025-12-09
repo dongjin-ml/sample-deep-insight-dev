@@ -1,4 +1,4 @@
-# Deep Insight: Multi-Agent Data Analysis System
+# Deep Insight: Managed-AgentCore Version
 
 > Automated data analysis system built with AWS Bedrock AgentCore Runtime
 
