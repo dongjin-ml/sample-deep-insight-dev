@@ -1,6 +1,6 @@
 # Deep Insight: Managed-AgentCore Version
 
-> Automated data analysis system built with AWS Bedrock AgentCore Runtime
+> Secure, customizable multi-agent system for large-scale data analysis on AWS Bedrock AgentCore
 
 ---
 
@@ -21,6 +21,7 @@ A Multi-Agent system built on AWS Bedrock AgentCore Runtime that analyzes large 
 - 🛡️ **Security Groups** - Least-privilege rules for AgentCore, ALB, Fargate, and VPC Endpoints
 
 *Customization*
+- 💻 **Custom Code Interpreter** - Your own Fargate-based Python/Bash executor with custom Docker image (ECR + ALB + Fargate)
 - 🐳 **Custom Docker Image** - Add your own fonts, system libraries, and Python packages
 - 📂 **Flexible Data Sources** - Support for large CSV files, text, log files (i.e. 1 GB), and metadata (i.e. JSON)
 - 🛠️ **Extensible Agents** - Modify prompts and add new agents to fit your requirements
@@ -52,25 +53,21 @@ A Multi-Agent system built on AWS Bedrock AgentCore Runtime that analyzes large 
 ┌─────────────────────────────────────────────────────────┐
 │  AgentCore Runtime (VPC Private)                        │
 │  ┌───────────────────────────────────────────────┐      │
-│  │ Coordinator (Strands Agent)                       │      │
-│  │  - Coder Agent → Validator Agent → Reporter  │      │
+│  │ Coordinator (Strands Agent)                   │      │
+│  │  - Coder Agent → Validator Agent → Reporter   │      │
 │  │  - Multi-Agent Workflow Orchestration         │      │
 │  └───────────────────────────────────────────────┘      │
 └────────────────┬────────────────────────────────────────┘
                  │ HTTP (Private)
                  ▼
 ┌─────────────────────────────────────────────────────────┐
-│  Internal ALB (Private Subnets)                         │
-│  - Target Group (Fargate Tasks)                         │
-│  - Health Checks & Routing                              │
-└────────────────┬────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────┐
-│  Fargate Containers (Private Subnets)                   │
-│  - Python Code Execution (Dynamic)                      │
-│  - Session Management (Cookie-based)                    │
-│  - Matplotlib, Pandas, Data Processing                  │
+│  Custom Code Interpreter (ECR + ALB + Fargate)          │
+│  ┌───────────────────────────────────────────────┐      │
+│  │  Internal ALB → Fargate Containers            │      │
+│  │  - Dynamic Python/Bash execution              │      │
+│  │  - Custom Docker image (your libraries)       │      │
+│  │  - Session-based with cookie management       │      │
+│  └───────────────────────────────────────────────┘      │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -109,8 +106,15 @@ sudo apt-get update && sudo apt-get install -y jq
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Update AWS CLI if needed
+# Linux x86_64
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip && sudo ./aws/install --update
+# Linux ARM64 (Graviton)
+# curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+unzip -o awscliv2.zip && sudo ./aws/install --update
+
+# macOS (Apple Silicon M1/M2/M3 or Intel)
+# curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+# sudo installer -pkg AWSCLIV2.pkg -target /
 ```
 
 ### Production Deployment
