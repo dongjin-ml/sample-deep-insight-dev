@@ -4,6 +4,8 @@
 
 **→ Back to [Main README](../../README.md)**
 
+> ⚠️ **Security Note:** The `.env` file contains sensitive AWS resource IDs. Do not commit it to git. It is already in `.gitignore`.
+
 ---
 
 ## 📊 Overview
@@ -28,7 +30,7 @@
 
 | Resource | Name Pattern | Description |
 |----------|--------------|-------------|
-| CloudFormation Stack | `deep-insight-phase1-{env}` | Parent stack |
+| CloudFormation Stack | `deep-insight-infrastructure-{env}` | Parent stack |
 | VPC | `deep-insight-vpc-{env}` | 10.0.0.0/16 |
 | Private Subnets (2) | `deep-insight-private-{az}` | For Fargate tasks |
 | Public Subnets (2) | `deep-insight-public-{az}` | For NAT Gateway |
@@ -50,7 +52,7 @@
 
 | Resource | Name Pattern | Description |
 |----------|--------------|-------------|
-| CloudFormation Stack | `deep-insight-phase2-{env}` | Fargate stack |
+| CloudFormation Stack | `deep-insight-fargate-{env}` | Fargate stack |
 | ECR Repository | `deep-insight-fargate-{env}` | Docker images |
 | Docker Image | `deep-insight-fargate-{env}:latest` | Python 3.12 + dependencies |
 | ECS Cluster | `deep-insight-cluster-{env}` | Fargate cluster |
@@ -65,7 +67,7 @@
 
 **Creates:** `managed-agentcore/.env`
 
-**Total: 42 variables**
+**Total: 45 variables** (42 from Phase 3 + 3 from Phase 4)
 
 | Category | Count | Variables |
 |----------|-------|-----------|
@@ -82,6 +84,7 @@
 | Phase 2: Network | 3 | `FARGATE_SUBNET_IDS`, `FARGATE_SECURITY_GROUP_IDS`, `FARGATE_ASSIGN_PUBLIC_IP` |
 | Phase 2: Container | 1 | `CONTAINER_NAME` |
 | S3 | 1 | `S3_BUCKET_NAME` |
+| Phase 4: Runtime | 3 | `RUNTIME_NAME`, `RUNTIME_ARN`, `RUNTIME_ID` (added by `01_create_agentcore_runtime_vpc.py`) |
 
 ```bash
 # ============================================================
@@ -154,6 +157,13 @@ CONTAINER_NAME=fargate-runtime
 # S3 Configuration (1 var)
 # ============================================================
 S3_BUCKET_NAME=deep-insight-logs-{region}-{account}
+
+# ============================================================
+# Phase 4: AgentCore Runtime (3 vars) - Added by 01_create_agentcore_runtime_vpc.py
+# ============================================================
+RUNTIME_NAME=deep_insight_runtime_vpc
+RUNTIME_ARN=arn:aws:bedrock-agentcore:{region}:{account}:runtime/deep_insight_runtime_vpc-{random}
+RUNTIME_ID=deep_insight_runtime_vpc-{random}
 ```
 
 ### 02_create_uv_env.sh
