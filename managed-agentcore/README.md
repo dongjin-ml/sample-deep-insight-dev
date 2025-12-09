@@ -2,6 +2,8 @@
 
 > Secure, customizable multi-agent system for large-scale data analysis on AWS Bedrock AgentCore
 
+**Last Updated**: 2025-12-09
+
 ---
 
 ## 🎯 Overview
@@ -290,6 +292,4 @@ MIT License
 
 ---
 
-**Version**: 3.0.0
-**Status**: ✅ Production Ready
-**Last Updated**: 2025-11-08
+
