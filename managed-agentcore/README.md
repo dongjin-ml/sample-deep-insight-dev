@@ -15,7 +15,10 @@ A Multi-Agent system built on AWS Bedrock AgentCore Runtime that analyzes large 
 **Key Features**:
 
 *Security*
-- 🔒 **Enterprise-Grade Security** - AgentCore VPC mode with fully private network (AgentCore ↔ ALB ↔ Fargate)
+- 🔒 **Enterprise-Grade Security** - 100% private VPC with no public internet access
+- 🌐 **AgentCore VPC Mode** - Runtime deployed in private subnets with VPC networking
+- 🔐 **VPC Endpoints** - Private connectivity to AWS services (Bedrock, ECR, S3, CloudWatch)
+- 🛡️ **Security Groups** - Least-privilege rules for AgentCore, ALB, Fargate, and VPC Endpoints
 
 *Customization*
 - 🐳 **Custom Docker Image** - Add your own fonts, system libraries, and Python packages
