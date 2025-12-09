@@ -44,13 +44,15 @@ Deploy Deep Insight in **your own AWS VPC** for complete data isolation and cont
 
 ## Why Deep Insight?
 
-Transform weeks of manual reporting work into minutes using hierarchical multi-agent systems built on Strands SDK and Amazon Bedrock.
+Transform complex data analysis into automated insights using hierarchical multi-agent systems built on Strands SDK and Amazon Bedrock.
 
-- **🎨 Full Customization & Control** - Modify agents, prompts, and workflows with complete code access in your AWS VPC
-- **🔒 Enterprise-Grade Security** - Single-tenant VPC deployment with complete data isolation
 - **🤖 Advanced Multi-Agent Architecture** - Hierarchical workflow with Coordinator, Planner, Supervisor, and specialized tool agents
+- **🎨 Full Customization & Control** - Modify agents, prompts, and workflows with complete code access
 - **🧠 Flexible Model Selection** - Choose different Claude models for each agent (Sonnet 4, Haiku 4, etc.) via simple .env configuration
+- **💻 Custom Code Interpreter** - Flexible code execution from local Python to Fargate-based containers with your own Docker image
 - **📊 Transparency & Verifiability** - Reports with calculation methods, sources, and reasoning processes
+- **🔒 Enterprise-Grade Security** - From local development to 100% private VPC with Bedrock AgentCore Runtime
+- **⚡ Production Scalability** - Concurrent processing with AgentCore MicroVM and auto-scaling Fargate containers
 - **🚀 Beyond Reporting** - Extend to any agent use case: shopping, support, log analysis, and more
 
 ## Quick Start

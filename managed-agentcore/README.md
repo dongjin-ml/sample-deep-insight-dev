@@ -30,11 +30,13 @@ A Multi-Agent system built on AWS Bedrock AgentCore Runtime that analyzes large 
 
 *Architecture & Infrastructure*
 - 🔄 **Strands Agent Framework** - Adapted to Bedrock AgentCore with custom code interpreter on serverless Fargate
-- ⚡ **Concurrent Processing** - Multiple simultaneous requests via AgentCore Micro VM and Fargate containers
+- ⚡ **Concurrent Processing** - Multiple simultaneous requests via AgentCore MicroVM and Fargate containers
 - ⏱️ **Long-Running Agent Tasks** - AgentCore and Fargate containers with adjustable vCPU/RAM for extended agent workflows
 - ☁️ **Infrastructure as Code** - CloudFormation nested stacks for reproducible deployments
 
 *Multi-Agent Workflow* (see [self-hosted](../self-hosted) for details)
+
+Orchestrated by Coordinator → Planner → Supervisor:
 - 📊 **Coder Agent** - Automated data analysis and calculations
 - ✅ **Validator Agent** - Result validation and citation generation
 - 📄 **Reporter Agent** - Automatic DOCX report generation
