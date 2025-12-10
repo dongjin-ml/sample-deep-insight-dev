@@ -14,80 +14,11 @@ A Multi-Agent system built on AWS Bedrock AgentCore Runtime that analyzes large 
 - **Customization**: Custom Docker images, extensible agents, flexible data sources for your requirements
 - **Architecture**: Strands Agent Framework on serverless Fargate with concurrent processing, long-running tasks, and Infrastructure as Code
 
-**Key Features**:
-
-*Security*
-- 🔒 **Enterprise-Grade Security** - 100% private VPC with no public internet access
-- 🌐 **AgentCore VPC Mode** - Runtime deployed in private subnets with VPC networking
-- 🔐 **VPC Endpoints** - Private connectivity to AWS services (Bedrock, ECR, S3, CloudWatch)
-- 🛡️ **Security Groups** - Least-privilege rules for AgentCore, ALB, Fargate, and VPC Endpoints
-
-*Customization*
-- 💻 **Custom Code Interpreter** - Your own Fargate-based Python/Bash executor with custom Docker image (ECR + ALB + Fargate)
-- 🐳 **Custom Docker Image** - Add your own fonts, system libraries, and Python packages
-- 📂 **Flexible Data Sources** - Support for large CSV files, text, log files (i.e. 1 GB), and metadata (i.e. JSON)
-- 🛠️ **Extensible Agents** - Modify prompts and add new agents to fit your requirements
-
-*Architecture & Infrastructure*
-- 🔄 **Strands Agent Framework** - Adapted to Bedrock AgentCore with custom code interpreter on serverless Fargate
-- ⚡ **Concurrent Processing** - Multiple simultaneous requests via AgentCore MicroVM and Fargate containers
-- ⏱️ **Long-Running Agent Tasks** - AgentCore and Fargate containers with adjustable vCPU/RAM for extended agent workflows
-- ☁️ **Infrastructure as Code** - CloudFormation nested stacks for reproducible deployments
-
-*Multi-Agent Workflow* (see [self-hosted](../self-hosted) for details)
-
-Orchestrated by Coordinator → Planner → Supervisor:
-- 📊 **Coder Agent** - Automated data analysis and calculations
-- ✅ **Validator Agent** - Result validation and citation generation
-- 📄 **Reporter Agent** - Automatic DOCX report generation
-- 📋 **Tracker Agent** - Workflow progress monitoring and task tracking
-
-> 📖 **[Compare with Self-Hosted →](production_deployment/docs/DEPLOYMENT_COMPARISON.md)** When to choose each option, feature comparison, and migration path
-
----
-
-## 📊 Architecture
-
-### High-Level Flow
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  User (Bedrock AgentCore API)                           │
-└────────────────┬────────────────────────────────────────┘
-                 │ invoke_runtime()
-                 ▼
-┌─────────────────────────────────────────────────────────┐
-│  AgentCore Runtime (VPC Private)                        │
-│  ┌───────────────────────────────────────────────┐      │
-│  │ Coordinator (Strands Agent)                   │      │
-│  │  - Coder Agent → Validator Agent → Reporter   │      │
-│  │  - Multi-Agent Workflow Orchestration         │      │
-│  └───────────────────────────────────────────────┘      │
-└────────────────┬────────────────────────────────────────┘
-                 │ HTTP (Private)
-                 ▼
-┌─────────────────────────────────────────────────────────┐
-│  Custom Code Interpreter (ECR + ALB + Fargate)          │
-│  ┌───────────────────────────────────────────────┐      │
-│  │  Internal ALB → Fargate Containers            │      │
-│  │  - Dynamic Python/Bash execution              │      │
-│  │  - Custom Docker image (your libraries)       │      │
-│  │  - Session-based with cookie management       │      │
-│  └───────────────────────────────────────────────┘      │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Network Architecture
-
-**100% Private Network** - No public internet access required:
-- VPC Endpoints for AWS services (Bedrock, ECR, S3, CloudWatch Logs)
-- NAT Gateway optional (VPC Endpoints handle all traffic)
-- Private subnets for Fargate tasks
-- Internal ALB for container routing
-
----
-
 ## 🚀 Quick Start
+
+### Tested Environments
+
+macOS (arm64), Amazon EC2 (arm64)
 
 ### Prerequisites
 
@@ -140,43 +71,78 @@ uv run 03_download_artifacts.py            # Download results
 
 ---
 
-## 🔑 What Each Phase Does
+## 📊 Architecture
 
-### Phase 1: Infrastructure (Nested CloudFormation Stacks)
+### High-Level Flow
 
 ```
-phase1-main.yaml (Parent Stack)
-├── NetworkStack           # VPC, 4 Subnets, NAT Gateway, Routes
-├── SecurityGroupsStack    # 4 Security Groups + 15 Ingress/Egress Rules
-├── VPCEndpointsStack      # Bedrock, ECR, Logs, S3 VPC Endpoints
-├── ALBStack               # Internal ALB + Target Group + Listener
-└── IAMStack               # Task Execution Role + Task Role + S3 Bucket
+User Query + Data Files (CSV, JSON)
+    ↓
+┌─────────────────────────────────────────────────────────┐
+│  User (Bedrock AgentCore API)                           │
+└────────────────┬────────────────────────────────────────┘
+                 │ invoke_runtime()
+                 ▼
+┌─────────────────────────────────────────────────────────┐
+│  AgentCore Runtime (VPC Private)                        │
+│  ┌───────────────────────────────────────────────┐      │
+│  │ Coordinator (Strands Agent)                   │      │
+│  │  - Coder Agent → Validator Agent → Reporter   │      │
+│  │  - Multi-Agent Workflow Orchestration         │      │
+│  └───────────────────────────────────────────────┘      │
+└────────────────┬────────────────────────────────────────┘
+                 │ HTTP (Private)
+                 ▼
+┌─────────────────────────────────────────────────────────┐
+│  Custom Code Interpreter (ECR + ALB + Fargate)          │
+│  ┌───────────────────────────────────────────────┐      │
+│  │  Internal ALB → Fargate Containers            │      │
+│  │  - Dynamic Python/Bash execution              │      │
+│  │  - Custom Docker image (your libraries)       │      │
+│  │  - Session-based with cookie management       │      │
+│  └───────────────────────────────────────────────┘      │
+└─────────────────────────────────────────────────────────┘
 ```
 
-- **VPC**: 10.0.0.0/16 with Multi-AZ deployment
-- **Security Groups**: 4 groups with least-privilege rules
-- **VPC Endpoints**: 6 endpoints for private AWS service access
-- **Internal ALB**: Private load balancer for Fargate containers
-- **IAM Roles**: Task Role + Execution Role with minimal permissions
+### Network Architecture
 
-### Phase 2: Fargate Runtime
-- **ECR Repository**: Private container registry
-- **Docker Image**: Python 3.12 + Korean font support
-- **ECS Cluster**: Fargate-based compute
-- **Task Definition**: 2 vCPU, 4 GB RAM, auto-scaling ready
+**100% Private Network** - No public internet access required:
+- VPC Endpoints for AWS services (Bedrock, ECR, S3, CloudWatch Logs)
+- NAT Gateway optional (VPC Endpoints handle all traffic)
+- Private subnets for Fargate tasks
+- Internal ALB for container routing
 
-### Phase 3: Environment Preparation
-- **UV Environment**: Python 3.12 + all dependencies
-- **Korean Font Support**: Nanum fonts for chart generation
-- **Install Tools**: Install additional tools as needed (e.g., Pandoc, TeXLive)
-- **Toolkit Patch**: Include prompts in Docker builds
-- **Symlinks**: Enable `uv run` from project root
+---
 
-### Phase 4: AgentCore Runtime
-- **Runtime Creation**: Automated VPC runtime deployment (01_create_agentcore_runtime_vpc.py)
-- **Runtime Testing**: End-to-end workflow testing with streaming output (02_invoke_agentcore_runtime_vpc.py)
-- **Artifact Management**: S3 artifact download and organization (03_download_artifacts.py)
-- **Cleanup**: Runtime deletion and resource cleanup (cleanup.sh)
+## ✨ Key Features
+
+### Security
+- 🔒 **Enterprise-Grade Security** - 100% private VPC with no public internet access
+- 🌐 **AgentCore VPC Mode** - Runtime deployed in private subnets with VPC networking
+- 🔐 **VPC Endpoints** - Private connectivity to AWS services (Bedrock, ECR, S3, CloudWatch)
+- 🛡️ **Security Groups** - Least-privilege rules for AgentCore, ALB, Fargate, and VPC Endpoints
+
+### Customization
+- 💻 **Custom Code Interpreter** - Your own Fargate-based Python/Bash executor with custom Docker image (ECR + ALB + Fargate)
+- 🐳 **Custom Docker Image** - Add your own fonts, system libraries, and Python packages
+- 📂 **Flexible Data Sources** - Support for large CSV files, text, log files (i.e. 1 GB), and metadata (i.e. JSON)
+- 🛠️ **Extensible Agents** - Modify prompts and add new agents to fit your requirements
+
+### Architecture & Infrastructure
+- 🔄 **Strands Agent Framework** - Adapted to Bedrock AgentCore with custom code interpreter on serverless Fargate
+- ⚡ **Concurrent Processing** - Multiple simultaneous requests via AgentCore MicroVM and Fargate containers
+- ⏱️ **Long-Running Agent Tasks** - AgentCore and Fargate containers with adjustable vCPU/RAM for extended agent workflows
+- ☁️ **Infrastructure as Code** - CloudFormation nested stacks for reproducible deployments
+
+### Multi-Agent Workflow
+
+Orchestrated by Coordinator → Planner → Supervisor (see [self-hosted](../self-hosted) for details):
+- 📊 **Coder Agent** - Automated data analysis and calculations
+- ✅ **Validator Agent** - Result validation and citation generation
+- 📄 **Reporter Agent** - Automatic DOCX report generation
+- 📋 **Tracker Agent** - Workflow progress monitoring and task tracking
+
+> 📖 **[Compare with Self-Hosted →](production_deployment/docs/DEPLOYMENT_COMPARISON.md)** When to choose each option, feature comparison, and migration path
 
 ---
 
@@ -207,6 +173,18 @@ phase1-main.yaml (Parent Stack)
 ├── 03_download_artifacts.py            # Download results
 └── README.md
 ```
+
+---
+
+## 🔧 Customization
+
+Customize the deployment for your needs:
+- **Use your own data** - Add CSV/JSON files under `data/`
+- **Modify dependencies** - Edit `fargate-runtime/requirements.txt`
+- **Customize Docker image** - Edit `fargate-runtime/Dockerfile`
+- **Modify agent prompts** - Edit files in `src/prompts/`
+
+> 📖 **[Customization Guide →](production_deployment/docs/CUSTOMIZATION.md)** Detailed instructions for each customization option
 
 ---
 
@@ -276,6 +254,7 @@ cd production_deployment/scripts/phase1
 
 ## 📚 Documentation
 
+- **[production_deployment/docs/CUSTOMIZATION.md](production_deployment/docs/CUSTOMIZATION.md)** - Use your own data, modify dependencies, customize Docker image
 - **[production_deployment/docs/DEPLOYMENT_COMPARISON.md](production_deployment/docs/DEPLOYMENT_COMPARISON.md)** - Self-Hosted vs Managed AgentCore comparison
 - **[production_deployment/docs/DEPLOYMENT_OUTPUTS.md](production_deployment/docs/DEPLOYMENT_OUTPUTS.md)** - What each script creates
 - **[production_deployment/docs/MULTI_REGION_DEPLOYMENT.md](production_deployment/docs/MULTI_REGION_DEPLOYMENT.md)** - Multi-region deployment
