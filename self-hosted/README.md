@@ -188,6 +188,41 @@ uv run python main.py --user_query "Analyze from sales and marketing perspective
 
 ---
 
+## 🔧 Change Agent Model IDs
+
+Each agent can use a different Bedrock model. Configure model IDs in `.env`:
+
+```bash
+# Default model for all agents
+DEFAULT_MODEL_ID=global.anthropic.claude-sonnet-4-20250514-v1:0
+
+# Use faster model for simple routing tasks
+COORDINATOR_MODEL_ID=global.anthropic.claude-haiku-4-5-20251001-v1:0
+
+# Use most capable model for complex planning
+PLANNER_MODEL_ID=global.anthropic.claude-opus-4-5-20251101-v1:0
+
+# Other agents
+CODER_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
+VALIDATOR_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
+REPORTER_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
+```
+
+### Available Models
+
+| Model | Model ID | Use Case |
+|-------|----------|----------|
+| Claude Opus 4.5 | `global.anthropic.claude-opus-4-5-20251101-v1:0` | Highest capability |
+| Claude Sonnet 4.5 | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` | Higher capability |
+| Claude Sonnet 4 | `global.anthropic.claude-sonnet-4-20250514-v1:0` | Balanced |
+| Claude Haiku 4.5 | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | Fast, lower cost |
+
+> **Finding other models**: Use `aws bedrock list-foundation-models --query "modelSummaries[?providerName=='Anthropic'].[modelId,modelName]" --output table` or see [Amazon Bedrock Model IDs](https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html)
+
+Changes take effect immediately (no rebuild required).
+
+---
+
 ## 🛠️ Modify Agent Prompts
 
 System prompts are stored as markdown files in `src/prompts/`:

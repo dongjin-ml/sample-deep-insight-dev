@@ -180,6 +180,7 @@ Orchestrated by Coordinator → Planner → Supervisor (see [self-hosted](../sel
 
 Customize the deployment for your needs:
 - **Use your own data** - Add CSV/JSON files under `data/`
+- **Change agent model IDs** - Configure different Claude models per agent in `.env`
 - **Modify dependencies** - Edit `fargate-runtime/requirements.txt`
 - **Customize Docker image** - Edit `fargate-runtime/Dockerfile`
 - **Modify agent prompts** - Edit files in `src/prompts/`

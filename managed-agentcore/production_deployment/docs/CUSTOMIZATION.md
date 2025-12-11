@@ -52,7 +52,77 @@ your_data.csv is the data file, and column_definitions.json contains column desc
 
 ---
 
-## 2. Modify Fargate Dependencies
+## 2. Change Agent Model IDs
+
+Each agent can use a different Bedrock model. Configure model IDs in the `.env` file located at `managed-agentcore/.env`.
+
+### Available Model ID Variables
+
+| Variable | Agent | Description |
+|----------|-------|-------------|
+| `DEFAULT_MODEL_ID` | All agents | Fallback model when specific agent model is not set |
+| `COORDINATOR_MODEL_ID` | Coordinator | Entry point agent that routes requests |
+| `PLANNER_MODEL_ID` | Planner | Strategic planning with extended thinking |
+| `SUPERVISOR_MODEL_ID` | Supervisor | Task orchestration and delegation |
+| `CODER_MODEL_ID` | Coder | Python/Bash code execution |
+| `VALIDATOR_MODEL_ID` | Validator | Result validation and verification |
+| `REPORTER_MODEL_ID` | Reporter | Report generation (DOCX, charts) |
+| `TRACKER_MODEL_ID` | Tracker | Progress monitoring |
+
+### Example: Using Different Models
+
+Edit `managed-agentcore/.env`:
+
+```bash
+# Default model for all agents
+DEFAULT_MODEL_ID=global.anthropic.claude-sonnet-4-20250514-v1:0
+
+# Use faster model for simple routing tasks
+COORDINATOR_MODEL_ID=global.anthropic.claude-haiku-4-5-20251001-v1:0
+
+# Use most capable model for complex planning
+PLANNER_MODEL_ID=global.anthropic.claude-opus-4-5-20251101-v1:0
+
+# Other agents use Sonnet 4.5
+CODER_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
+VALIDATOR_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
+REPORTER_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
+```
+
+### Available Bedrock Model IDs
+
+| Model | Model ID | Use Case |
+|-------|----------|----------|
+| Claude Opus 4.5 | `global.anthropic.claude-opus-4-5-20251101-v1:0` | Highest capability, complex reasoning |
+| Claude Sonnet 4.5 | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` | Higher capability, extended thinking |
+| Claude Sonnet 4 | `global.anthropic.claude-sonnet-4-20250514-v1:0` | Balanced performance and cost |
+| Claude Haiku 4.5 | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | Fast responses, lower cost |
+
+### Finding Other Model IDs
+
+To find model IDs for other Bedrock models:
+
+1. **AWS Console**: Go to [Amazon Bedrock Console](https://console.aws.amazon.com/bedrock/) → Model access → View model details
+2. **AWS CLI**:
+   ```bash
+   aws bedrock list-foundation-models --query "modelSummaries[?providerName=='Anthropic'].[modelId,modelName]" --output table
+   ```
+3. **Documentation**: [Amazon Bedrock Model IDs](https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html)
+
+> **Note**: Model availability varies by AWS region. Check [Amazon Bedrock model access](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html) for your region.
+
+### Apply Changes
+
+After modifying `.env`, recreate the runtime to apply new model configurations:
+
+```bash
+cd managed-agentcore
+uv run 01_create_agentcore_runtime_vpc.py
+```
+
+---
+
+## 3. Modify Fargate Dependencies
 
 The Fargate container runs your Python code. To add custom Python packages:
 
@@ -90,7 +160,7 @@ uv run 01_create_agentcore_runtime_vpc.py
 
 ---
 
-## 3. Customize Docker Image
+## 4. Customize Docker Image
 
 For system-level customizations (fonts, libraries), modify the Dockerfile:
 
@@ -118,7 +188,7 @@ cd production_deployment/scripts/phase2
 
 ---
 
-## 4. Modify Agent Prompts
+## 5. Modify Agent Prompts
 
 System prompts are stored as markdown files in `src/prompts/`:
 
@@ -145,7 +215,8 @@ uv run 01_create_agentcore_runtime_vpc.py
 
 | Customization | Files to Modify | Action Required |
 |---------------|-----------------|-----------------|
-| Use your own data | `data/`, query in `02_invoke_*.py` | None |
-| Python packages | `fargate-runtime/requirements.txt` | Docker rebuild (`phase2/deploy.sh`) |
-| System packages/fonts | `fargate-runtime/Dockerfile` | Docker rebuild (`phase2/deploy.sh`) |
-| Agent behavior | `src/prompts/*.md` | Runtime recreate (`01_create_agentcore_runtime_vpc.py`) |
+| 1. Use your own data | `data/`, query in `02_invoke_*.py` | None |
+| 2. Agent model IDs | `.env` | Runtime recreate (`01_create_agentcore_runtime_vpc.py`) |
+| 3. Python packages | `fargate-runtime/requirements.txt` | Docker rebuild (`phase2/deploy.sh`) |
+| 4. System packages/fonts | `fargate-runtime/Dockerfile` | Docker rebuild (`phase2/deploy.sh`) |
+| 5. Agent behavior | `src/prompts/*.md` | Runtime recreate (`01_create_agentcore_runtime_vpc.py`) |
