@@ -144,17 +144,6 @@ else
     exit 1
 fi
 
-# Install Korean font support
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-bash "$SCRIPT_DIR/install_korean_font.sh"
-
-# Install PDF generation dependencies
-sudo apt-get update
-sudo apt-get install pandoc -y
-sudo apt-get install texlive -y
-sudo apt-get install texlive-xetex -y
-sudo apt-get install poppler-utils -y
-
 # 5. Jupyter 커널 등록
 print_info "Jupyter 커널 등록 중..."
 DISPLAY_NAME="$ENV_NAME (UV)"
