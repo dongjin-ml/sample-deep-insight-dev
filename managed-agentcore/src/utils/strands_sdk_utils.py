@@ -149,7 +149,7 @@ class strands_utils():
             model_id=model_id,
             streaming=True,
             cache_tools="default" if tool_cache else None,
-            max_tokens=8192*5,
+            max_tokens=64000,  # Changed from 8192*8 (65536) to stay within model limit
             stop_sequences=["\n\nHuman"],
             temperature=1 if enable_reasoning else 0.01,
             additional_request_fields={

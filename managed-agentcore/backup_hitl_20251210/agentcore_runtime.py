@@ -447,6 +447,7 @@ def _generate_request_id() -> str:
     print(f"{SEPARATOR_LINE}\n", flush=True)
     return request_id
 
+
 def _setup_fargate_context(request_id: str) -> None:
     """
     Set up Fargate session context for request.

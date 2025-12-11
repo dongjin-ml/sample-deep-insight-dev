@@ -50,6 +50,7 @@ import json
 import sys
 import os
 import argparse
+import threading
 from datetime import datetime
 import textwrap
 import traceback
@@ -167,7 +168,6 @@ DATA_DIRECTORY = args.data_directory or os.getenv("DATA_DIRECTORY", "./data")
 
 # S3 bucket for human-in-the-loop feedback
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "")
-
 
 # ============================================================
 # Human-in-the-Loop Feedback Functions
@@ -367,7 +367,7 @@ def main():
                 if event_data is None:
                     continue
 
-                # Check for human-in-the-loop events
+                # Check for plan_review_request event (human-in-the-loop)
                 event_type = event_data.get("type") or event_data.get("event_type")
                 if event_type == "plan_review_request":
                     # Handle plan review - blocks until user provides feedback

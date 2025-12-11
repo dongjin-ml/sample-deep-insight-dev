@@ -339,7 +339,7 @@ async def supervisor_node(task=None, **kwargs):
 
     # Create message with cache point for messages caching
     # This caches the large context (full_plan, clues) for cost savings
-    message = [ContentBlock(text=message_text), ContentBlock(cachePoint={"type": "default"})]  # Cache point for messages caching
+    message = [ContentBlock(text=message_text)]  # No cache point - system prompt cache only
 
     # Process streaming response and collect text in one pass
     full_text = ""

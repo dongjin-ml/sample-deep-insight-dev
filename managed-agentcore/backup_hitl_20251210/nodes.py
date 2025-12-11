@@ -1,7 +1,7 @@
 
 import os
-import time
 import json
+import time
 import logging
 import asyncio
 import boto3
@@ -16,7 +16,7 @@ from src.utils.s3_utils import get_s3_feedback_key, check_s3_feedback, delete_s3
 # Load environment variables
 load_dotenv()
 
-# Plan feedback configuration (Human-in-the-Loop)
+# Plan feedback configuration
 MAX_PLAN_REVISIONS = int(os.getenv("MAX_PLAN_REVISIONS", "10"))
 PLAN_FEEDBACK_TIMEOUT = int(os.getenv("PLAN_FEEDBACK_TIMEOUT", "300"))  # 5 minutes default
 PLAN_FEEDBACK_POLL_INTERVAL = int(os.getenv("PLAN_FEEDBACK_POLL_INTERVAL", "3"))  # 3 seconds
@@ -64,35 +64,8 @@ FULL_PLAN_FORMAT = "Here is full plan :\n\n<full_plan>\n{}\n</full_plan>\n\n*Ple
 CLUES_FORMAT = "Here is clues from {}:\n\n<clues>\n{}\n</clues>\n\n"
 
 
-def should_handoff_to_planner(_):
-    """Check if coordinator requested handoff to planner."""
-
-    tracer = trace.get_tracer(
-        instrumenting_module_name=os.getenv("TRACER_MODULE_NAME", "insight_extractor_agent"),
-        instrumenting_library_version=os.getenv("TRACER_LIBRARY_VERSION", "1.0.0")
-    )
-    with tracer.start_as_current_span("should_handoff_to_planner") as span:
-        # Check coordinator's response for handoff request
-        global _global_node_states
-        shared_state = _global_node_states.get('shared', {})
-        history = shared_state.get('history', [])
-
-        # Look for coordinator's last message
-        for entry in reversed(history):
-            if entry.get('agent') == 'coordinator':
-                message = entry.get('message', '')
-
-                # Add Event
-                add_span_event(span, "input_message", {"message": str(message)})
-                add_span_event(span, "response", {"handoff_to_planner": bool("handoff_to_planner" in message)})
-
-                return 'handoff_to_planner' in message
-
-        return False
-
-
 # ============================================================
-# Plan Revision Conditional Functions (Human-in-the-Loop)
+# Plan Revision Conditional Functions
 # ============================================================
 
 def _check_plan_revision_state():
@@ -136,6 +109,33 @@ def should_proceed_to_supervisor(_):
         logger.info(f"should_proceed_to_supervisor: {result}")
         add_span_event(span, "condition_check", {"should_proceed_to_supervisor": result})
         return result
+
+
+def should_handoff_to_planner(_):
+    """Check if coordinator requested handoff to planner."""
+
+    tracer = trace.get_tracer(
+        instrumenting_module_name=os.getenv("TRACER_MODULE_NAME", "insight_extractor_agent"),
+        instrumenting_library_version=os.getenv("TRACER_LIBRARY_VERSION", "1.0.0")
+    )
+    with tracer.start_as_current_span("should_handoff_to_planner") as span:
+        # Check coordinator's response for handoff request
+        global _global_node_states
+        shared_state = _global_node_states.get('shared', {})
+        history = shared_state.get('history', [])
+
+        # Look for coordinator's last message
+        for entry in reversed(history):
+            if entry.get('agent') == 'coordinator':
+                message = entry.get('message', '')
+
+                # Add Event
+                add_span_event(span, "input_message", {"message": str(message)})
+                add_span_event(span, "response", {"handoff_to_planner": bool("handoff_to_planner" in message)})
+
+                return 'handoff_to_planner' in message
+
+        return False
 
 async def coordinator_node(task=None, **kwargs):
 
@@ -222,7 +222,7 @@ async def planner_node(task=None, **kwargs):
         instrumenting_module_name=os.getenv("TRACER_MODULE_NAME", "insight_extractor_agent"),
         instrumenting_library_version=os.getenv("TRACER_LIBRARY_VERSION", "1.0.0")
     )
-    with tracer.start_as_current_span("planner") as span:   
+    with tracer.start_as_current_span("planner") as span:
         """Planner node that generates detailed plans for task execution."""
         log_node_start("Planner")
         global _global_node_states
@@ -237,7 +237,7 @@ async def planner_node(task=None, **kwargs):
             logger.warning("No shared state found in global storage")
             return None, {"text": "No shared state available"}
 
-        # Check if this is a revision request (Human-in-the-Loop)
+        # Check if this is a revision request
         is_revision = shared_state.get('plan_revision_requested', False)
         plan_feedback = shared_state.get('plan_feedback', '')
         previous_plan = shared_state.get('full_plan', '')
@@ -300,6 +300,66 @@ async def planner_node(task=None, **kwargs):
         add_span_event(span, "revision_info", {"is_revision": is_revision, "revision_count": revision_count})
 
         log_node_complete("Planner")
+        # Return response only
+        return response
+
+async def supervisor_node(task=None, **kwargs):
+    """Supervisor node that decides which agent should act next."""
+    log_node_start("Supervisor")
+    global _global_node_states
+
+    # task and kwargs parameters are unused - supervisor relies on global state
+    tracer = trace.get_tracer(
+        instrumenting_module_name=os.getenv("TRACER_MODULE_NAME", "insight_extractor_agent"),
+        instrumenting_library_version=os.getenv("TRACER_LIBRARY_VERSION", "1.0.0")
+    )
+    with tracer.start_as_current_span("supervisor") as span:  
+
+        # Extract shared state from global storage
+        shared_state = _global_node_states.get('shared', None)
+
+        if not shared_state:
+            logger.warning("No shared state found in global storage")
+            return None, {"text": "No shared state available"}
+
+        agent = strands_utils.get_agent(
+            agent_name="supervisor",
+            system_prompts=apply_prompt_template(prompt_name="supervisor", prompt_context={}),
+            model_id=os.getenv("SUPERVISOR_MODEL_ID", os.getenv("DEFAULT_MODEL_ID")),
+            enable_reasoning=False,
+            prompt_cache_info=(True, "default"),  # enable prompt caching for reasoning agent
+            tool_cache=True,
+            tools=[coder_agent_custom_interpreter_tool, reporter_agent_custom_interpreter_tool, tracker_agent_tool, validator_agent_custom_interpreter_tool],  # Add coder, reporter, tracker and validator agents as tools
+            streaming=True,
+        )
+
+        clues, full_plan, messages = shared_state.get("clues", ""), shared_state.get("full_plan", ""), shared_state["messages"]
+        message_text = '\n\n'.join([messages[-1]["content"][-1]["text"], FULL_PLAN_FORMAT.format(full_plan), clues])
+
+        # Create message with cache point for messages caching
+        # This caches the large context (full_plan, clues) for cost savings
+        message = [ContentBlock(text=message_text), ContentBlock(cachePoint={"type": "default"})]  # Cache point for messages caching
+
+        # Process streaming response and collect text in one pass
+        full_text = ""
+        async for event in strands_utils.process_streaming_response_yield(
+            agent, message, agent_name="supervisor", source="supervisor_node"
+        ):
+            if event.get("event_type") == "text_chunk":
+                full_text += event.get("data", "")
+            # Accumulate token usage
+            TokenTracker.accumulate(event, shared_state)
+        response = {"text": full_text}
+
+        # Update shared global state
+        shared_state['history'].append({"agent":"supervisor", "message": response["text"]})
+
+        # Add Event
+        add_span_event(span, "input_message", {"message": str(message)})
+        add_span_event(span, "response", {"response": str(response["text"])})
+
+        log_node_complete("Supervisor")
+        logger.info("Workflow completed")
         # Return response only
         return response
 
@@ -438,66 +498,3 @@ async def plan_reviewer_node(task=None, **kwargs):
             add_span_event(span, "revision_requested", {"feedback": user_feedback, "new_revision_count": revision_count + 1})
             log_node_complete("PlanReviewer")
             return {"text": f"Revision requested: {user_feedback}", "approved": False, "feedback": user_feedback}
-
-
-async def supervisor_node(task=None, **kwargs):
-    """Supervisor node that decides which agent should act next."""
-    log_node_start("Supervisor")
-    global _global_node_states
-
-    # task and kwargs parameters are unused - supervisor relies on global state
-    tracer = trace.get_tracer(
-        instrumenting_module_name=os.getenv("TRACER_MODULE_NAME", "insight_extractor_agent"),
-        instrumenting_library_version=os.getenv("TRACER_LIBRARY_VERSION", "1.0.0")
-    )
-    with tracer.start_as_current_span("supervisor") as span:  
-
-        # Extract shared state from global storage
-        shared_state = _global_node_states.get('shared', None)
-
-        if not shared_state:
-            logger.warning("No shared state found in global storage")
-            return None, {"text": "No shared state available"}
-
-        agent = strands_utils.get_agent(
-            agent_name="supervisor",
-            system_prompts=apply_prompt_template(prompt_name="supervisor", prompt_context={}),
-            model_id=os.getenv("SUPERVISOR_MODEL_ID", os.getenv("DEFAULT_MODEL_ID")),
-            enable_reasoning=False,
-            prompt_cache_info=(True, "default"),  # enable prompt caching for reasoning agent
-            tool_cache=True,
-            tools=[coder_agent_custom_interpreter_tool, reporter_agent_custom_interpreter_tool, tracker_agent_tool, validator_agent_custom_interpreter_tool],  # Add coder, reporter, tracker and validator agents as tools
-            streaming=True,
-        )
-
-        clues, full_plan, messages = shared_state.get("clues", ""), shared_state.get("full_plan", ""), shared_state["messages"]
-        message_text = '\n\n'.join([messages[-1]["content"][-1]["text"], FULL_PLAN_FORMAT.format(full_plan), clues])
-
-        # Create message with cache point for messages caching
-        # This caches the large context (full_plan, clues) for cost savings
-        # NOTE: Message cache disabled to avoid "maximum 4 cache_control blocks" error in multi-turn tool calls
-        # message = [ContentBlock(text=message_text), ContentBlock(cachePoint={"type": "default"})]  # Cache point for messages caching
-        message = [ContentBlock(text=message_text)]  # No cache point - system prompt cache only
-
-        # Process streaming response and collect text in one pass
-        full_text = ""
-        async for event in strands_utils.process_streaming_response_yield(
-            agent, message, agent_name="supervisor", source="supervisor_node"
-        ):
-            if event.get("event_type") == "text_chunk":
-                full_text += event.get("data", "")
-            # Accumulate token usage
-            TokenTracker.accumulate(event, shared_state)
-        response = {"text": full_text}
-
-        # Update shared global state
-        shared_state['history'].append({"agent":"supervisor", "message": response["text"]})
-
-        # Add Event
-        add_span_event(span, "input_message", {"message": str(message)})
-        add_span_event(span, "response", {"response": str(response["text"])})
-
-        log_node_complete("Supervisor")
-        logger.info("Workflow completed")
-        # Return response only
-        return response

@@ -212,14 +212,14 @@ AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID
 # ============================================================
 # Bedrock Model Configuration
 # ============================================================
-DEFAULT_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
-COORDINATOR_MODEL_ID=global.anthropic.claude-haiku-4-5-20251001-v1:0
-PLANNER_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
-SUPERVISOR_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
-CODER_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
-VALIDATOR_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
+DEFAULT_MODEL_ID=global.anthropic.claude-sonnet-4-20250514-v1:0
+COORDINATOR_MODEL_ID=global.anthropic.claude-sonnet-4-20250514-v1:0
+PLANNER_MODEL_ID=global.anthropic.claude-sonnet-4-20250514-v1:0
+SUPERVISOR_MODEL_ID=global.anthropic.claude-sonnet-4-20250514-v1:0
+CODER_MODEL_ID=global.anthropic.claude-sonnet-4-20250514-v1:0
+VALIDATOR_MODEL_ID=global.anthropic.claude-sonnet-4-20250514-v1:0
 REPORTER_MODEL_ID=global.anthropic.claude-sonnet-4-20250514-v1:0
-TRACKER_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
+TRACKER_MODEL_ID=global.anthropic.claude-sonnet-4-20250514-v1:0
 
 # ============================================================
 # Phase 1: Infrastructure Outputs
@@ -283,6 +283,16 @@ cat >> "$ENV_FILE" <<EOF
 # S3 Configuration
 # ============================================================
 S3_BUCKET_NAME=$S3_BUCKET_NAME
+
+# ============================================================
+# Human-in-the-Loop (Plan Feedback) Configuration
+# ============================================================
+# Maximum number of plan revision attempts before auto-approval
+MAX_PLAN_REVISIONS=10
+# Timeout in seconds to wait for user feedback before auto-approval
+PLAN_FEEDBACK_TIMEOUT=300
+# Polling interval in seconds to check S3 for feedback file
+PLAN_FEEDBACK_POLL_INTERVAL=3
 EOF
 
 # Preserve existing Runtime configuration (if exists)
