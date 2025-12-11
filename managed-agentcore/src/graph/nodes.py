@@ -386,7 +386,7 @@ async def plan_reviewer_node(task=None, **kwargs):
                 break
 
             # Emit keepalive event to prevent connection timeout
-            if poll_count % 10 == 0:  # Every ~30 seconds
+            if poll_count % 2 == 0:  # Every ~6 seconds (2 polls × 3 seconds)
                 keepalive_event = {
                     "type": "plan_review_keepalive",
                     "event_type": "plan_review_keepalive",
